@@ -1,0 +1,14 @@
+{
+  "name": "ai-agent-lab",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "lint": "echo 'lint placeholder'",
+    "typecheck": "echo 'typecheck placeholder'",
+    "build": "echo 'build placeholder'"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
