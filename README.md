@@ -36,8 +36,8 @@ runtime sea otro, se reescribe un adaptador, no los agentes.
 | Fase | Qué prueba | Estado |
 |---|---|---|
 | 0 · Fundación | saber qué hay | **cerrada** |
-| 1 · Un agente encerrado | que la frontera sea real | siguiente |
-| 2 · Frontera de escritura | que BUILD no se salga | |
+| 1 · Un agente encerrado | que la frontera sea real | **cerrada** |
+| 2 · Frontera de escritura | que BUILD no se salga | siguiente |
 | 3 · Verificación | que el sistema no crea | |
 | 4 · Ciclo de tres | RECON → BUILD → REVIEW | |
 | 5 · Orquestación | que ATLAS decida | |

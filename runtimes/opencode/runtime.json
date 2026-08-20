@@ -3,11 +3,13 @@
   "runtime": "opencode",
   "verified_version": "1.18.18",
   "verified_at": "2026-08-20",
-  "provider": "opencode",
+  "provider": "openrouter",
   "model_map": {
     "$comment": "Traduce el id neutral del contrato al id que ESTE runtime ofrece. Es la única pieza que sabe de proveedores; por eso cambiar de runtime no obliga a tocar agents/.",
-    "nemotron-3-ultra": "opencode/nemotron-3-ultra-free",
-    "glm-5.2": "opencode/hy3-free"
+    "$note": "El proveedor 'opencode' (Zen) se descartó el 20-ago-2026: su credencial devolvía 401 Invalid API key. Ver docs/audits/fase-1.md, H-15.",
+    "nemotron-3-ultra": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nemotron-3-super": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+    "glm-5.2": "openrouter/z-ai/glm-5.2:free"
   },
   "tools": [
     "bash",
