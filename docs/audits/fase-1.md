@@ -94,9 +94,40 @@ GET https://openrouter.ai/api/v1/auth/key
 Comprobado contra la API de OpenRouter directamente, no a través de OpenCode. La
 clave está revocada o su cuenta ya no existe. Se define en `~/.bashrc`.
 
+### H-15 · BLOQUEANTE · La credencial de OpenCode Zen tampoco autentica
+
+Segundo intento, por otra vía: se registró una credencial del proveedor `opencode`
+(OpenCode Zen), método `api`. Queda guardada en `~/.local/share/opencode/auth.json`
+y `opencode auth list` la muestra.
+
+Existir no es servir. Contra el endpoint real del proveedor:
+
+```
+POST https://opencode.ai/zen/v1/chat/completions
+→ HTTP 401 {"type":"error","error":{"type":"AuthError","message":"Invalid API key."}}
+```
+
+Comprobado también con dos modelos distintos (`nemotron-3-ultra-free` y
+`nemotron-3.5-lightning-free`): el mismo 401. No es un problema de modelo ni del CLI.
+
+La credencial guardada tiene forma correcta —73 caracteres, prefijo `sk-o`, sin
+espacios ni saltos— y aun así el servicio la rechaza. Forma válida y credencial
+válida son cosas distintas, y solo la segunda importa.
+
+*(Metadatos únicamente: en ningún momento se leyó ni se registró el valor.)*
+
 Con esto, el estado de proveedores de la máquina es: **cero rutas de ejecución
-disponibles.** `opencode auth list` no tiene credenciales, y la única variable de
-entorno presente no autentica.
+disponibles**, por dos caminos independientes.
+
+| Proveedor | Credencial | Resultado |
+|---|---|---|
+| OpenRouter | `OPENROUTER_API_KEY` en `~/.bashrc` | 401 `User not found.` |
+| OpenCode Zen | `auth.json`, método `api` | 401 `Invalid API key.` |
+
+Es un dato en sí mismo: **el proyecto lleva tiempo sin una sola ruta de ejecución
+viva.** Ninguno de los agentes escritos hasta hoy ha corrido nunca. Eso explica la
+sensación de estar atrasado mucho mejor que cualquier problema de diseño, y no es un
+problema de diseño.
 
 **H-02 no queda resuelto por esta fase, solo desplazado**: el modelo ya apunta a un
 proveedor correcto; lo que falta ahora es una credencial que funcione.
@@ -133,7 +164,7 @@ Ese es el trabajo que el frontmatter escrito a mano nunca iba a hacer.
 
 | Gate | Estado | Nota |
 |---|---|---|
-| G1.1 arranca | 🔴 | bloqueado por H-13 |
+| G1.1 arranca | 🔴 | bloqueado por H-13 y H-15: cero proveedores autentican |
 | G1.2 cumple el contrato | ⚪ | requiere G1.1 |
 | G1.3 no inventa | ⚪ | requiere G1.1 |
 | G1.4 prueba de fuga | 🔴 | **el gate central**; bloqueado por H-13 y por H-14 |
