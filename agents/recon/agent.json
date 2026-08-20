@@ -1,0 +1,98 @@
+{
+  "$comment": "Contrato de agente. Neutral respecto al runtime. Los adaptadores de runtimes/ traducen esto; este archivo nunca contiene sintaxis de un runtime concreto.",
+  "id": "recon",
+  "version": "1.0.0",
+  "role": "subagent",
+  "purpose": "Entender un repositorio y reportar lo que hay, con evidencia, antes de que nadie lo modifique.",
+  "inputs": {
+    "target": "Ruta del repositorio a investigar.",
+    "question": "Opcional. Enfoque concreto de la investigación."
+  },
+  "model": {
+    "preferred": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "requires": [
+      "tool_calling"
+    ],
+    "min_context": 200000,
+    "rationale": "RECON lee muchos archivos en una sola pasada; el contexto corto lo empuja a inferir en vez de leer."
+  },
+  "tools": {
+    "$comment": "Solo 'allow' es normativo. El adaptador niega por defecto TODA herramienta del runtime que no esté aquí, así que una herramienta nueva nace negada. 'deny' es documentación de intención sobre herramientas que existen de verdad.",
+    "allow": [
+      "read",
+      "glob",
+      "grep"
+    ],
+    "deny": [
+      "edit",
+      "write",
+      "bash",
+      "task",
+      "webfetch",
+      "todowrite",
+      "skill",
+      "question"
+    ]
+  },
+  "scope": {
+    "read": [
+      "**"
+    ],
+    "write": [],
+    "rationale": "Sin rutas de escritura. RECON es estrictamente de lectura; si necesita escribir, el diseño está mal."
+  },
+  "prohibitions": [
+    {
+      "what": "ejecutar comandos",
+      "why": "un comando puede modificar el árbol; la investigación no debe alterar lo investigado"
+    },
+    {
+      "what": "invocar otros agentes",
+      "why": "RECON informa, no decide qué pasa después; encadenar es trabajo del orquestador"
+    },
+    {
+      "what": "acceder a la red",
+      "why": "el hallazgo tiene que salir del repositorio, no de fuera; si no, la evidencia no es auditable"
+    },
+    {
+      "what": "leer secretos",
+      "why": "no los necesita para su trabajo y su reporte se guarda"
+    },
+    {
+      "what": "crear archivos con 'write'",
+      "why": "'write' es una herramienta distinta de 'edit'. El contrato original negaba solo 'edit', y por eso RECON podía crear archivos siendo un agente de solo lectura."
+    }
+  ],
+  "output": {
+    "format": "markdown",
+    "required_sections": [
+      "Repository Identity",
+      "Detected Stack",
+      "Project Structure",
+      "Architecture",
+      "Tooling and Quality",
+      "Development Workflow",
+      "Existing Project Context",
+      "Contradictions",
+      "Unknowns",
+      "Evidence Ledger"
+    ],
+    "must_end_with": [
+      "Repository understanding",
+      "Major unknowns",
+      "Major contradictions",
+      "Ready for implementation"
+    ]
+  },
+  "success": [
+    "Las diez secciones están presentes.",
+    "El Evidence Ledger cita rutas que existen de verdad en el objetivo.",
+    "Al menos un hallazgo aparece como UNKNOWN o INFERRED: un RECON que nunca duda está inventando.",
+    "Ninguna afirmación de stack se apoya solo en prosa del README."
+  ],
+  "limits": [
+    "Si falta información crítica de arquitectura, devuelve 'Ready for implementation: NO' en vez de rellenar el hueco.",
+    "Si dos fuentes se contradicen, reporta el conflicto; no elige una en silencio.",
+    "No propone implementación. Ese no es su trabajo."
+  ]
+}

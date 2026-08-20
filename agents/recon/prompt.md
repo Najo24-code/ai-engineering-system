@@ -1,34 +1,3 @@
----
-# GENERADO por runtimes/opencode/sync.mjs — no editar a mano.
-# Fuente: agents/recon/agent.json + agents/recon/prompt.md
-description: "Entender un repositorio y reportar lo que hay, con evidencia, antes de que nadie lo modifique."
-mode: subagent
-model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
-permission:
-  bash: deny
-  edit: deny
-  task: deny
-  webfetch: deny
-  external_directory: deny
-tools:
-  bash: false
-  context_briefing: false
-  context_daily: false
-  context_search: false
-  edit: false
-  invalid: false
-  policy_gate: false
-  question: false
-  skill: false
-  task: false
-  todowrite: false
-  webfetch: false
-  write: false
-  read: true
-  glob: true
-  grep: true
----
-
 # RECON — Repository Intelligence Agent
 
 ## Mission

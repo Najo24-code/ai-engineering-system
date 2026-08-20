@@ -1,0 +1,24 @@
+{
+  "$comment": "Hechos VERIFICADOS del runtime, no supuestos. Cada campo se comprobó contra opencode 1.18.18 en esta máquina el 2026-08-20. Método en docs/audits/fase-1.md. Al subir de versión hay que volver a verificarlo: este archivo caduca.",
+
+  "runtime": "opencode",
+  "verified_version": "1.18.18",
+  "verified_at": "2026-08-20",
+
+  "tools": [
+    "bash", "edit", "glob", "grep", "invalid", "question",
+    "read", "skill", "task", "todowrite", "webfetch", "write"
+  ],
+
+  "plugin_tools": ["context_briefing", "context_daily", "context_search", "policy_gate"],
+
+  "permission_keys_honored": ["edit", "bash", "webfetch", "task", "doom_loop", "external_directory"],
+
+  "notes": [
+    "La regla base del agente resuelto es {permission:'*', pattern:'*', action:'allow'}: lo que no se niega, queda permitido.",
+    "Las claves de 'permission' que no están en permission_keys_honored se descartan EN SILENCIO. No dan error.",
+    "'write' es una herramienta distinta de 'edit'. Negar 'edit' NO impide crear archivos.",
+    "'read', 'glob' y 'grep' no son claves válidas de 'permission'. Se controlan con el mapa 'tools'.",
+    "'websearch' y 'list' NO EXISTEN en este runtime, aunque se acepten sin queja en el frontmatter."
+  ]
+}
