@@ -1,0 +1,20 @@
+# Dependencias
+node_modules/
+
+# Estado de runtime (nunca versionar: puede contener transcripts y credenciales)
+oc.db
+*.db
+.opencode/node_modules/
+.opencode/.claude/
+
+# Artefactos de sesión de Claude Code
+.claude/.cc-writes/
+
+# Logs y auditorías locales sin consolidar
+*.jsonl
+*.log
+
+# Entorno
+.env
+.env.*
+!.env.example
