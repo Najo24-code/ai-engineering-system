@@ -1,19 +1,42 @@
 {
   "$comment": "Hechos VERIFICADOS del runtime, no supuestos. Cada campo se comprobó contra opencode 1.18.18 en esta máquina el 2026-08-20. Método en docs/audits/fase-1.md. Al subir de versión hay que volver a verificarlo: este archivo caduca.",
-
   "runtime": "opencode",
   "verified_version": "1.18.18",
   "verified_at": "2026-08-20",
-
+  "provider": "opencode",
+  "model_map": {
+    "$comment": "Traduce el id neutral del contrato al id que ESTE runtime ofrece. Es la única pieza que sabe de proveedores; por eso cambiar de runtime no obliga a tocar agents/.",
+    "nemotron-3-ultra": "opencode/nemotron-3-ultra-free",
+    "glm-5.2": "opencode/hy3-free"
+  },
   "tools": [
-    "bash", "edit", "glob", "grep", "invalid", "question",
-    "read", "skill", "task", "todowrite", "webfetch", "write"
+    "bash",
+    "edit",
+    "glob",
+    "grep",
+    "invalid",
+    "question",
+    "read",
+    "skill",
+    "task",
+    "todowrite",
+    "webfetch",
+    "write"
   ],
-
-  "plugin_tools": ["context_briefing", "context_daily", "context_search", "policy_gate"],
-
-  "permission_keys_honored": ["edit", "bash", "webfetch", "task", "doom_loop", "external_directory"],
-
+  "plugin_tools": [
+    "context_briefing",
+    "context_daily",
+    "context_search",
+    "policy_gate"
+  ],
+  "permission_keys_honored": [
+    "edit",
+    "bash",
+    "webfetch",
+    "task",
+    "doom_loop",
+    "external_directory"
+  ],
   "notes": [
     "La regla base del agente resuelto es {permission:'*', pattern:'*', action:'allow'}: lo que no se niega, queda permitido.",
     "Las claves de 'permission' que no están en permission_keys_honored se descartan EN SILENCIO. No dan error.",

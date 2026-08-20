@@ -9,12 +9,13 @@
     "question": "Opcional. Enfoque concreto de la investigación."
   },
   "model": {
-    "preferred": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "preferred": "nemotron-3-ultra",
     "requires": [
       "tool_calling"
     ],
     "min_context": 200000,
-    "rationale": "RECON lee muchos archivos en una sola pasada; el contexto corto lo empuja a inferir en vez de leer."
+    "rationale": "RECON lee muchos archivos en una sola pasada; el contexto corto lo empuja a inferir en vez de leer.",
+    "$comment": "Id neutral. Cada runtime lo traduce en su model_map; el contrato no nombra proveedores."
   },
   "tools": {
     "$comment": "Solo 'allow' es normativo. El adaptador niega por defecto TODA herramienta del runtime que no esté aquí, así que una herramienta nueva nace negada. 'deny' es documentación de intención sobre herramientas que existen de verdad.",

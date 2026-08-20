@@ -22,7 +22,6 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 const AGENTS_DIR = join(ROOT, "agents")
 const TARGET_DIR = join(ROOT, "lab", ".opencode", "agents")
-const PROVIDER = "openrouter"
 
 const RT = JSON.parse(readFileSync(join(HERE, "runtime.json"), "utf8"))
 const check = process.argv.includes("--check")
@@ -88,10 +87,16 @@ function render(contract, id) {
   const { permission, tools } = buildPermissions(contract, id)
   const prompt = readFileSync(join(AGENTS_DIR, id, "prompt.md"), "utf8").trimEnd()
 
+  const wanted = contract.model.preferred
+  const model = RT.model_map[wanted]
+  if (!model) {
+    fail(id, `pide el modelo "${wanted}", que no está en el model_map de ${RT.runtime}`)
+  }
+
   const head = {
     description: JSON.stringify(contract.purpose),
     mode: contract.role,
-    model: `${PROVIDER}/${contract.model.preferred}`,
+    model: model ?? "SIN-RESOLVER",
   }
 
   return [
@@ -110,16 +115,28 @@ function render(contract, id) {
   ].join("\n")
 }
 
-let drift = 0
 const ids = readdirSync(AGENTS_DIR, { withFileTypes: true })
   .filter((e) => e.isDirectory())
   .map((e) => e.name)
 
-for (const id of ids) {
+// Se renderiza todo en memoria primero. Nada toca el disco hasta que TODOS los
+// contratos son válidos: un archivo a medio generar es peor que ninguno, porque
+// parece configuración buena.
+const rendered = ids.map((id) => {
   const contract = JSON.parse(readFileSync(join(AGENTS_DIR, id, "agent.json"), "utf8"))
   if (contract.id !== id) fail(id, `el campo id dice "${contract.id}" pero la carpeta se llama "${id}"`)
+  return { id, out: render(contract, id) }
+})
 
-  const out = render(contract, id)
+if (problems.length) {
+  console.error("El contrato no es válido para este runtime:")
+  for (const p of problems) console.error(`  - ${p}`)
+  console.error("\nNo se escribió nada.")
+  process.exit(2)
+}
+
+let drift = 0
+for (const { id, out } of rendered) {
   const path = join(TARGET_DIR, `${id}.md`)
   const current = existsSync(path) ? readFileSync(path, "utf8") : null
 
@@ -134,11 +151,6 @@ for (const id of ids) {
   }
 }
 
-if (problems.length) {
-  console.error("\nEl contrato no es válido para este runtime:")
-  for (const p of problems) console.error(`  - ${p}`)
-  process.exit(2)
-}
 if (drift) {
   console.error(`\n${drift} agente(s) desincronizado(s). Corre sync.mjs sin --check.`)
   process.exit(1)
