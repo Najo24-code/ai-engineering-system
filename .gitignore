@@ -22,3 +22,10 @@ oc.db
 # Temporales del banco de fronteras (core/verification/boundary.mjs)
 lab/.opencode/agents/__bp_*.md
 lab/boundary-probe-*.txt
+
+# Corridas del flujo (evidencia local, no versionada)
+runs/
+
+# La evidencia citada por una auditoria SI se versiona: sin ella el informe
+# es una afirmacion sin respaldo.
+!docs/audits/evidence/*.jsonl

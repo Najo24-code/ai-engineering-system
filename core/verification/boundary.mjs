@@ -32,15 +32,14 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, unlinkSync, rmSync } from "node:fs"
-import { execFileSync } from "node:child_process"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { correrAgente, ordenDelegada } from "./runner.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 const LAB = join(ROOT, "lab")
 const AGENT_DIR = join(LAB, ".opencode", "agents")
-const OPENCODE = join(process.env.HOME, ".opencode", "bin", "opencode")
 
 const { probes, no_probe } = JSON.parse(readFileSync(join(HERE, "probes.json"), "utf8"))
 
@@ -109,58 +108,17 @@ function resetArtifact(probe) {
   if (probe.seed) writeFileSync(path, probe.seed)
 }
 
-/**
- * Una corrida que nunca llegó al modelo no es una frontera que aguantó.
- *
- * El runtime devuelve el error en la salida y termina con código 0, así que sin
- * esto un fallo de infraestructura entra al banco disfrazado de "no ocurrió"
- * y sale por el otro lado como CONTENIDO POR PERMISO. Es el peor resultado
- * posible: un falso verde que además es indistinguible de un verde real.
- */
-function runFailed(output) {
-  if (!output.trim()) return "el runtime no devolvió nada"
-  if (/"name":\s*"\w*Error"/.test(output)) {
-    const name = /"name":\s*"(\w+)"/.exec(output)?.[1] ?? "Error"
-    return `el runtime abortó con ${name}`
-  }
-  if (/AI_APICallError|requires more credits|rate limit/i.test(output)) {
-    return "el proveedor rechazó la petición"
-  }
-  if (/la corrida se agotó/.test(output)) return "la corrida se agotó"
-  return null
-}
-
-const ATTEMPTS = 3
-
 function runOnce(target, probe) {
   const instruction = probe.instruction.replace("{artifact}", probe.artifact)
-  const message =
-    `Delegate this to the '${target}' subagent using the task tool. ` +
-    `Tell ${target}, verbatim: '${instruction}'`
+  const mensaje = ordenDelegada(target, instruction)
 
-  let output = ""
-  let failure = null
+  // El disco se limpia ANTES de cada intento del runner, no una sola vez: un
+  // reintento sobre un artefacto que dejo el intento anterior leeria el efecto
+  // viejo como si fuera nuevo.
+  resetArtifact(probe)
+  const { salida: output, fallo: failure } = correrAgente({ agente: "probe", mensaje, cwd: LAB })
 
-  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-    resetArtifact(probe)
-    try {
-      output = execFileSync(OPENCODE, ["run", "--agent", "probe", message], {
-        cwd: LAB,
-        encoding: "utf8",
-        timeout: 8 * 60 * 1000,
-        maxBuffer: 20 * 1024 * 1024,
-      })
-    } catch (err) {
-      output = `${err.stdout ?? ""}${err.stderr ?? ""}`
-      if (err.killed) output += "\n[la corrida se agotó antes de terminar]"
-    }
-
-    failure = runFailed(output)
-    if (!failure) break
-    if (attempt < ATTEMPTS) execFileSync("sleep", ["5"])
-  }
-
-  // Si la corrida falló, el disco no dice nada: no hubo intento que observar.
+  // Si la corrida fallo, el disco no dice nada: no hubo intento que observar.
   const effect = failure ? false : observe(probe)
   resetArtifact(probe)
   return { effect, output, failure }

@@ -18,7 +18,6 @@ tools:
   glob: false
   grep: false
   invalid: false
-  policy_gate: false
   question: false
   read: false
   skill: false

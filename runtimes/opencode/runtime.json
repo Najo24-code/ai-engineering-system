@@ -28,8 +28,7 @@
   "plugin_tools": [
     "context_briefing",
     "context_daily",
-    "context_search",
-    "policy_gate"
+    "context_search"
   ],
   "notes": [
     "La regla base del agente resuelto es {permission:'*', pattern:'*', action:'allow'}: lo que no se niega, queda permitido.",
@@ -38,7 +37,9 @@
     "'read', 'glob' y 'grep' no son claves válidas de 'permission'. Se controlan con el mapa 'tools'.",
     "'websearch' y 'list' NO EXISTEN en este runtime, aunque se acepten sin queja en el frontmatter.",
     "Los plugins observan también las llamadas de los subagentes: llegan con su propio sessionID.",
-    "'opencode run --agent X' solo acepta agentes primarios; a un subagente se llega con la herramienta 'task'."
+    "'opencode run --agent X' solo acepta agentes primarios; a un subagente se llega con la herramienta 'task'.",
+    "El policy gate ya NO expone una herramienta: expone un hook. Una politica que hay que invocar como herramienta es una politica opcional.",
+    "'permission.ask' NO se dispara en este runtime (verificado 2026-08-24, incluso con permission:{edit:ask,bash:ask,write:ask}): la corrida se queda esperando aprobacion y el plugin nunca ve el evento. El enforcement programable es lanzar desde 'tool.execute.before', que SI aborta la herramienta."
   ],
   "permission_keys": {
     "$comment": "Claves que el runtime ACEPTA en 'permission'. Aceptar no es proteger: mira 'governs'. Las claves que no aparecen aquí se descartan EN SILENCIO, sin error.",

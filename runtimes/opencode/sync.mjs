@@ -23,6 +23,15 @@ const ROOT = join(HERE, "..", "..")
 const AGENTS_DIR = join(ROOT, "agents")
 const TARGET_DIR = join(ROOT, "lab", ".opencode", "agents")
 
+/**
+ * El frontmatter solo sabe decir sí o no por herramienta. Para BUILD eso no
+ * alcanza: necesita escribir, y la pregunta no es "¿puede escribir?" sino
+ * "¿dónde?". Ese alcance lo aplica el policy gate en cada llamada, y lo lee de
+ * aquí. Se GENERA desde los mismos contratos para que no exista una segunda
+ * versión de la verdad que se desincronice en silencio.
+ */
+const SCOPES_PATH = join(ROOT, "lab", ".opencode", "scopes.generated.json")
+
 const RT = JSON.parse(readFileSync(join(HERE, "runtime.json"), "utf8"))
 const check = process.argv.includes("--check")
 
@@ -122,11 +131,41 @@ const ids = readdirSync(AGENTS_DIR, { withFileTypes: true })
 // Se renderiza todo en memoria primero. Nada toca el disco hasta que TODOS los
 // contratos son válidos: un archivo a medio generar es peor que ninguno, porque
 // parece configuración buena.
+const scopes = {}
+
 const rendered = ids.map((id) => {
   const contract = JSON.parse(readFileSync(join(AGENTS_DIR, id, "agent.json"), "utf8"))
   if (contract.id !== id) fail(id, `el campo id dice "${contract.id}" pero la carpeta se llama "${id}"`)
+
+  // Un alcance ausente no es un alcance vacío: es un contrato que no contestó la
+  // pregunta. Se rechaza en vez de asumir la respuesta permisiva.
+  for (const campo of ["read", "write", "shell"]) {
+    if (!Array.isArray(contract.scope?.[campo])) {
+      fail(id, `scope.${campo} falta o no es una lista; el policy gate no puede aplicar un alcance que nadie declaró`)
+    }
+  }
+  // Una herramienta que no tiene se declara como alcance vacío, no se omite:
+  // omitirla haría que el gate lo tratara como "sin contrato".
+  const usaBash = contract.tools.allow.includes("bash")
+  if (!usaBash && contract.scope?.shell?.length) {
+    fail(id, `declara comandos en scope.shell pero no tiene la herramienta bash`)
+  }
+
+  scopes[id] = { write: contract.scope.write, shell: contract.scope.shell }
   return { id, out: render(contract, id) }
 })
+
+const scopesOut =
+  JSON.stringify(
+    {
+      $comment:
+        "GENERADO por runtimes/opencode/sync.mjs — no editar a mano. Lo lee lab/.opencode/plugins/policy-gate.ts en cada llamada de herramienta. Un agente que no aparece aquí no queda sin gobierno: le siguen aplicando las reglas universales de core/policies/policy.mjs.",
+      generado_desde: "agents/*/agent.json",
+      agents: scopes,
+    },
+    null,
+    2,
+  ) + "\n"
 
 if (problems.length) {
   console.error("El contrato no es válido para este runtime:")
@@ -136,8 +175,13 @@ if (problems.length) {
 }
 
 let drift = 0
-for (const { id, out } of rendered) {
-  const path = join(TARGET_DIR, `${id}.md`)
+const salidas = [...rendered.map(({ id, out }) => ({ id, out, path: join(TARGET_DIR, `${id}.md`) })), {
+  id: "scopes.generated.json",
+  out: scopesOut,
+  path: SCOPES_PATH,
+}]
+
+for (const { id, out, path } of salidas) {
   const current = existsSync(path) ? readFileSync(path, "utf8") : null
 
   if (current === out) {

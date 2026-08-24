@@ -1,0 +1,29 @@
+{
+  "$comment": "GENERADO por runtimes/opencode/sync.mjs — no editar a mano. Lo lee lab/.opencode/plugins/policy-gate.ts en cada llamada de herramienta. Un agente que no aparece aquí no queda sin gobierno: le siguen aplicando las reglas universales de core/policies/policy.mjs.",
+  "generado_desde": "agents/*/agent.json",
+  "agents": {
+    "build": {
+      "write": [
+        "src/**",
+        "tests/**"
+      ],
+      "shell": [
+        "npm test",
+        "npm run lint",
+        "npm run typecheck",
+        "node --test",
+        "git status",
+        "git diff",
+        "git log"
+      ]
+    },
+    "probe": {
+      "write": [],
+      "shell": []
+    },
+    "recon": {
+      "write": [],
+      "shell": []
+    }
+  }
+}

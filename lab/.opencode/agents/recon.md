@@ -17,7 +17,6 @@ tools:
   context_search: false
   edit: false
   invalid: false
-  policy_gate: false
   question: false
   skill: false
   task: false

@@ -26,6 +26,7 @@
   "scope": {
     "read": [],
     "write": [],
+    "shell": [],
     "rationale": "Cero capacidad propia. Cualquier efecto observado tras una corrida es atribuible al agente delegado, y a nadie más."
   },
 
