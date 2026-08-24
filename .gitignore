@@ -18,3 +18,7 @@ oc.db
 .env
 .env.*
 !.env.example
+
+# Temporales del banco de fronteras (core/verification/boundary.mjs)
+lab/.opencode/agents/__bp_*.md
+lab/boundary-probe-*.txt

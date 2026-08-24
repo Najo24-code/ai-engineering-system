@@ -1,5 +1,5 @@
 {
-  "$comment": "Hechos VERIFICADOS del runtime, no supuestos. Cada campo se comprobó contra opencode 1.18.18 en esta máquina el 2026-08-20. Método en docs/audits/fase-1.md. Al subir de versión hay que volver a verificarlo: este archivo caduca.",
+  "$comment": "Hechos VERIFICADOS del runtime, no supuestos. Cada campo se comprobó contra opencode 1.18.18 en esta máquina el 2026-08-20, y las fronteras además se comprobaron EJECUTANDO (core/verification/boundary.mjs), no leyendo el esquema. Al subir de versión hay que volver a verificarlo Y volver a correr el banco: este archivo caduca.",
   "runtime": "opencode",
   "verified_version": "1.18.18",
   "verified_at": "2026-08-20",
@@ -31,19 +31,66 @@
     "context_search",
     "policy_gate"
   ],
-  "permission_keys_honored": [
-    "edit",
-    "bash",
-    "webfetch",
-    "task",
-    "doom_loop",
-    "external_directory"
-  ],
   "notes": [
     "La regla base del agente resuelto es {permission:'*', pattern:'*', action:'allow'}: lo que no se niega, queda permitido.",
-    "Las claves de 'permission' que no están en permission_keys_honored se descartan EN SILENCIO. No dan error.",
-    "'write' es una herramienta distinta de 'edit'. Negar 'edit' NO impide crear archivos.",
+    "Las claves de 'permission' que no están en permission_keys se descartan EN SILENCIO. No dan error.",
+    "'write' es una herramienta distinta de 'edit', y 'edit: deny' NO la impide. Solo 'tools: {write: false}' la contiene.",
     "'read', 'glob' y 'grep' no son claves válidas de 'permission'. Se controlan con el mapa 'tools'.",
-    "'websearch' y 'list' NO EXISTEN en este runtime, aunque se acepten sin queja en el frontmatter."
-  ]
+    "'websearch' y 'list' NO EXISTEN en este runtime, aunque se acepten sin queja en el frontmatter.",
+    "Los plugins observan también las llamadas de los subagentes: llegan con su propio sessionID.",
+    "'opencode run --agent X' solo acepta agentes primarios; a un subagente se llega con la herramienta 'task'."
+  ],
+  "permission_keys": {
+    "$comment": "Claves que el runtime ACEPTA en 'permission'. Aceptar no es proteger: mira 'governs'. Las claves que no aparecen aquí se descartan EN SILENCIO, sin error.",
+    "edit": {
+      "governs": [
+        "edit"
+      ],
+      "does_not_govern": [
+        "write"
+      ],
+      "evidence": "docs/audits/fase-1.md H-16: un agente con edit:deny y tools:{write:true} creó el archivo. Verificado en disco."
+    },
+    "bash": {
+      "governs": [
+        "bash"
+      ],
+      "does_not_govern": [],
+      "evidence": "pendiente de control positivo; ver banco de fronteras"
+    },
+    "webfetch": {
+      "governs": [
+        "webfetch"
+      ],
+      "does_not_govern": [],
+      "evidence": "no probado con sonda: requiere servicio externo"
+    },
+    "task": {
+      "governs": [
+        "task"
+      ],
+      "does_not_govern": [],
+      "evidence": "no probado con sonda: delegar no deja rastro en disco"
+    },
+    "doom_loop": {
+      "governs": [
+        "doom_loop"
+      ],
+      "does_not_govern": [],
+      "evidence": "no investigado"
+    },
+    "external_directory": {
+      "governs": [
+        "acceso fuera del directorio del proyecto"
+      ],
+      "does_not_govern": [],
+      "evidence": "no probado con sonda"
+    }
+  },
+  "enforcement": {
+    "$comment": "Cuál de las dos capas contiene de verdad. Esto es lo que hay que leer antes de escribir un contrato.",
+    "real": "El mapa 'tools: {x: false}' determina el conjunto de herramientas que se le ENTREGA al modelo. La herramienta prohibida no existe para él: no hay nada que denegar en tiempo de ejecución.",
+    "weaker": "El bloque 'permission' produce reglas que se evalúan al invocar. Útil, pero solo cubre las claves de arriba y no siempre gobierna lo que su nombre sugiere.",
+    "rule": "Un contrato se hace cumplir con 'tools' por default-deny. 'permission' es refuerzo, nunca la única capa."
+  }
 }

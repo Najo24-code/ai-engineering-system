@@ -60,8 +60,8 @@ function buildPermissions(contract, id) {
 
   for (const t of effectiveDeny) {
     tools[t] = false                                   // el mapa que sí controla read/glob/grep/write
-    if (RT.permission_keys_honored.includes(t)) {
-      permission[t] = "deny"                           // segunda capa, para las claves que el runtime honra
+    if (Object.prototype.hasOwnProperty.call(RT.permission_keys, t)) {
+      permission[t] = "deny"                           // segunda capa; refuerzo, nunca la única
     }
   }
   for (const t of allow) tools[t] = true
