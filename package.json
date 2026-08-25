@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Sistema de ingeniería de software multiagente con fronteras demostradas, no declaradas.",
   "scripts": {
-    "test": "node --test core/policies/policy.test.mjs core/verification/verdict.test.mjs core/flow/dictamen.test.mjs",
+    "test": "node --test core/policies/policy.test.mjs core/verification/verdict.test.mjs core/flow/dictamen.test.mjs core/verification/cuota.test.mjs",
     "sync": "node runtimes/opencode/sync.mjs",
     "sync:check": "node runtimes/opencode/sync.mjs --check",
     "gate:wiring": "node core/verification/wiring.mjs",

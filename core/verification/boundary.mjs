@@ -34,7 +34,8 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, rmSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { correrAgente, ordenDelegada } from "./runner.mjs"
+import { correrAgente, ordenDelegada, FALLO } from "./runner.mjs"
+import { sondearCuota, alcanza, costoMedido, cuandoVuelve, CUOTA } from "./cuota.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -116,19 +117,54 @@ function runOnce(target, probe) {
   // reintento sobre un artefacto que dejo el intento anterior leeria el efecto
   // viejo como si fuera nuevo.
   resetArtifact(probe)
-  const { salida: output, fallo: failure } = correrAgente({ agente: "probe", mensaje, cwd: LAB })
+  const { salida: output, fallo: failure, clase } = correrAgente({ agente: "probe", mensaje, cwd: LAB })
 
   // Si la corrida fallo, el disco no dice nada: no hubo intento que observar.
   const effect = failure ? false : observe(probe)
   resetArtifact(probe)
-  return { effect, output, failure }
+  return { effect, output, failure, clase }
 }
 
 const results = []
 
-try {
-  const tools = onlyTool ? [onlyTool] : Object.keys(probes)
+/**
+ * Cuánto cuesta una corrida de sonda, en peticiones al proveedor.
+ *
+ * Es una ESTIMACIÓN, y está aquí escrita como tal para que el preflight tenga
+ * con qué comparar. El número real lo mide el propio banco al terminar (mira
+ * "coste medido" abajo) y cada corrida completa lo corrige.
+ *
+ * Punto de partida: el banco de la Fase 4 —nueve corridas— agotó él solo un tope
+ * de cincuenta.
+ */
+const PETICIONES_POR_CORRIDA = 6
 
+const tools = onlyTool ? [onlyTool] : Object.keys(probes)
+const corridasPrevistas = tools.filter((t) => probes[t]).length * 3
+
+/** El modelo que el agente declara, traducido al id que espera la API. */
+function modeloDelAgente(id) {
+  const src = readFileSync(join(AGENT_DIR, `${id}.md`), "utf8")
+  return /^model: (.*)$/m.exec(src)[1].trim().replace(/^openrouter\//, "")
+}
+
+// Preflight. Cuesta UNA petición cuando hay cuota y CERO cuando no la hay, que
+// es justo al revés de lo que costaría descubrirlo corriendo el banco.
+const modelo = modeloDelAgente(agentId)
+const antes = await sondearCuota({ apiKey: process.env.OPENROUTER_API_KEY, modelo })
+const puerta = alcanza(antes, corridasPrevistas * PETICIONES_POR_CORRIDA)
+
+console.log(`Cuota: ${antes.estado} — ${puerta.motivo}`)
+if (!puerta.sigue) {
+  console.error(
+    `\nEl banco no arranca. ${corridasPrevistas} corridas necesitan ~${corridasPrevistas * PETICIONES_POR_CORRIDA} peticiones.` +
+      `\nUn banco que arranca sin presupuesto no produce un resultado peor: produce media evidencia,` +
+      `\nque es la que se lee como si fuera entera.`,
+  )
+  process.exit(5)
+}
+
+try {
   for (const tool of tools) {
     const probe = probes[tool]
     if (!probe) {
@@ -175,6 +211,18 @@ try {
       failure: broken?.failure ?? null,
     })
     console.log(`  → ${verdict}${broken ? `: ${broken.failure}` : ""}`)
+
+    // Si lo que rompió la corrida fue la cuota o la credencial, las fronteras
+    // que quedan no van a correr mejor. Seguir solo añade "SIN CORRIDA" a la
+    // lista y hace más largo el rato hasta enterarse.
+    if (broken?.clase === FALLO.TERMINAL) {
+      const pendientes = tools.slice(tools.indexOf(tool) + 1)
+      if (pendientes.length) {
+        console.error(`\nSe corta aquí: ${broken.failure}. Sin probar: ${pendientes.join(", ")}.`)
+        for (const t of pendientes) results.push({ tool: t, verdict: "SIN CORRIDA", failure: broken.failure })
+      }
+      break
+    }
   }
 } finally {
   if (!keep) for (const p of temps) rmSync(p, { force: true })
@@ -188,6 +236,30 @@ console.log(`\n${"═".repeat(58)}`)
 console.log(`Agente: ${agentId}`)
 for (const r of results) {
   console.log(`  ${r.tool.padEnd(10)} ${r.verdict}`)
+}
+
+// Coste medido, no estimado. Dos sondas —una al entrar, otra al salir— convierten
+// "esto gasta mucho" en un número, y el número corrige la estimación de arriba
+// para la próxima vez. Es la misma regla que el resto del proyecto: lo que no se
+// puede medir no pasa.
+const corridasHechas = results.filter((r) => r.verdict !== "SIN SONDA" && r.verdict !== "SIN CORRIDA").length * 3
+const despues = await sondearCuota({ apiKey: process.env.OPENROUTER_API_KEY, modelo })
+const gasto = costoMedido(antes, despues)
+
+if (gasto != null && corridasHechas) {
+  // Las dos sondas se descuentan: son coste del medidor, no del banco.
+  const delBanco = Math.max(gasto - 2, 0)
+  console.log(
+    `\nCoste medido: ${delBanco} peticiones en ${corridasHechas} corridas ` +
+      `(~${(delBanco / corridasHechas).toFixed(1)} por corrida; la estimación era ${PETICIONES_POR_CORRIDA}).`,
+  )
+} else {
+  console.log(`\nCoste medido: no se pudo medir — ${despues.detalle || "el proveedor no dijo cuántas quedan"}.`)
+}
+if (despues.estado === CUOTA.AGOTADA) {
+  console.log(`Cuota agotada al terminar; se renueva ${cuandoVuelve(despues.resetMs)}.`)
+} else if (despues.restantes != null) {
+  console.log(`Quedan ${despues.restantes} peticiones.`)
 }
 
 const leaks = results.filter((r) => r.verdict === "FUGA")

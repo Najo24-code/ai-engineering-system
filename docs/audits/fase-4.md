@@ -197,6 +197,55 @@ sea esta, cada frontera nueva compite con el trabajo real por el mismo cupo, y l
 regla dura del proyecto —ninguna frontera se da por buena sin cablearla— se vuelve
 impagable.
 
+## El presupuesto deja de ser una sorpresa
+
+*(2026-08-25, sin gastar una sola petición.)*
+
+Que la cuota bloquee es del proveedor. Que bloquee **a mitad del banco** era
+nuestro, y eran cuatro defectos encadenados:
+
+1. **El rechazo por cuota se clasificaba como fallo pasajero.** El runtime
+   envuelve el 429 del proveedor en su propio `AI_APICallError`, así que la rama
+   genérica de «abortó con un Error» lo atrapaba primero y `correrAgente` le daba
+   sus tres reintentos con diez segundos de espera. Reintentar una cuota agotada
+   es esperar diez segundos a que pase un día.
+2. **El banco no se detenía.** Muerta la cuota en la corrida 1 de 9, hacía las
+   ocho restantes igual: veinticuatro lanzamientos del runtime para producir una
+   lista de `SIN CORRIDA`.
+3. **No había preflight.** Nadie sabía, antes de arrancar, si había presupuesto
+   para lo que iba a pedir.
+4. **El coste nunca se medía.** «Una corrida no es una petición» era una anécdota
+   escrita aquí arriba, no un número.
+
+`core/verification/cuota.mjs` cierra los cuatro. El preflight cuesta **una**
+petición cuando hay cuota y **cero** cuando no la hay —un 429 se rechaza antes de
+facturar—, que es exactamente al revés de lo que costaba descubrirlo corriendo el
+banco. Comprobado en vivo con la cuota a cero:
+
+```
+Cuota: AGOTADA — no queda cuota; se renueva a las 08:00 p. m. (en 8h 27min)
+El banco no arranca. 3 corridas necesitan ~18 peticiones.
+```
+
+**0,7 segundos y salida 5**, contra los varios minutos de lanzamientos inútiles
+que costaba antes llegar a la misma conclusión.
+
+Dos distinciones que el archivo defiende con pruebas porque confundirlas sale
+caro. Una credencial rechazada **no** es falta de cuota: tratarla como tal manda a
+esperar un reset que no va a arreglar nada, porque mañana la credencial seguirá
+siendo inválida. Y la duda **no** cierra la puerta: si el proveedor no dice
+cuántas quedan, se arranca a ciegas y se dice que se arranca a ciegas —una puerta
+que se cierra ante cada hipo de red convierte el silencio en trabajo que no se
+hace.
+
+Al terminar, el banco resta las dos lecturas y publica lo que costó de verdad. Si
+el contador subió, en medio cayó el reset diario: la resta no significa nada y se
+declara sin medir, en vez de publicar un negativo con cara de dato.
+
+20 pruebas nuevas, deterministas y sin red (`npm test`: **66/66**). La que manda es
+la del 429 disfrazado de `AI_APICallError`: lo que decide ahí es el **orden** de
+las comprobaciones, y un orden que nadie prueba se rompe en el primer refactor.
+
 ## Lo que falta para cerrar la Fase 4
 
 1. `node core/verification/boundary.mjs review --tool edit` y `--tool bash`.
