@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url"
 
 import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
 import { veredicto } from "../verification/verdict.mjs"
+import { testsRetiradosDeclarados } from "../verification/regresion.mjs"
 import { leerDictamen, citasRotasEnAmbasRaices } from "./dictamen.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -94,7 +95,12 @@ const medido = veredicto({
   proyecto: CWD,
   base: leer("--base") ?? "HEAD",
   alcance,
-  informe: { texto: reporteBuild ?? "" },
+  informe: {
+    texto: reporteBuild ?? "",
+    // Lo que BUILD declara haber retirado. Sin pasarlo, el control de regresión
+    // rechazaría también las retiradas que BUILD sí escribió en su informe.
+    tests_retirados: testsRetiradosDeclarados(reporteBuild ?? ""),
+  },
   comando: leer("--comando")?.split(" ").filter(Boolean),
 })
 guardar("veredicto.json", JSON.stringify(medido, null, 2))

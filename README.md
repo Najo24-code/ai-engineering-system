@@ -78,6 +78,10 @@ Están en `docs/ARCHITECTURE.md` con la evidencia de cada una.
   acordara de enumerar el peligro.
 - **E** el verificador — `core/verification/verdict.mjs`. No bloquea acciones:
   rechaza **afirmaciones**. Regla dura: **lo que no se puede medir no pasa.**
+  Mide cinco: la suite (la corre él, encerrada), la regresión de la suite, el
+  alcance del diff, los secretos que añade y las citas del informe. La de
+  regresión existe porque las otras cuatro miran el estado final, y borrar los
+  tests que se pusieron en rojo deja un estado final impecable.
 
 ---
 

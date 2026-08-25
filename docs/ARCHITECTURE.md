@@ -141,6 +141,23 @@ propia, y por eso el verificador corre fuera del agente.
 Su regla dura: **lo que no se puede medir no pasa.** "No supe leer la salida de
 la suite" nunca se traduce en "la suite pasó".
 
+Mide cinco cosas: la **suite** (la corre él, encerrada), la **regresión** de la
+suite, el **alcance** del diff, los **secretos** que el cambio añade y las
+**citas** del informe.
+
+El de regresión (`core/verification/regresion.mjs`) llegó el 2026-08-25 auditando
+una fase ya cerrada, y su hallazgo dice algo general sobre esta capa: **los otros
+cuatro controles miran el estado final, y hay engaños que solo viven en la
+diferencia.** Un agente que rompe una función y borra los tests que la cubrían
+entrega una foto final impecable —suite verde, alcance correcto, sin secretos, sin
+citas rotas— y un informe sin una sola cifra falsa. Aprobaba. Lo que lo delata es
+que la suite de después es más flaca que la de antes.
+
+Su forma es la de la capa entera y conviene leerla así: no prohíbe retirar tests
+—prohibirlo produciría rojos falsos sobre trabajo correcto, y un verificador que
+rechaza trabajo correcto se apaga en una semana—, obliga a **declararlo**. El
+verificador no impide la acción: impide que la afirmación se sostenga sin decirla.
+
 ### El error que hay que no repetir
 
 La lógica de política puede estar perfectamente escrita y aun así no aplicarse nunca,

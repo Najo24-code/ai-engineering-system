@@ -95,6 +95,26 @@ Un renglón por archivo: `ruta` — qué cambió y para qué.
 ## Verification
 El comando que corriste y su salida literal.
 
+## Retired Tests
+Cada test que tu cambio **borra, renombra o apaga** (`.skip`, `.todo`,
+`xit`, `@pytest.mark.skip`), un renglón por test y en este formato exacto:
+
+    `nombre exacto del test` — por qué
+
+El nombre va entre acentos graves y es el que aparece en el archivo, copiado
+carácter a carácter: es lo que se compara contra el diff. Vale "nada".
+
+No es una confesión: retirar un test que cubría código que ya no existe es
+parte del trabajo. Lo que no puede pasar es que la suite adelgace sin que se
+vea, porque entonces el verde de después no dice lo mismo que el de antes.
+El verificador mide esta lista contra el diff, así que un nombre que falte
+rechaza la entrega entera.
+
+**Nunca retires un test para que la suite deje de estar en rojo.** Si un test
+que ya existía se pone rojo por tu cambio, el rojo es tuyo: arréglalo, o entrega
+con `Verification result: FAIL` y dilo. Un test en rojo es información; un test
+borrado es información destruida.
+
 ## Out of Scope
 Lo que viste que está mal y NO tocaste porque no te lo pidieron.
 Vale "nada". No vale inventar para llenar.

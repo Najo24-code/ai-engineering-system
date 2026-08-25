@@ -53,6 +53,7 @@ import { coincideGlob, normalizarRuta } from "../policies/policy.mjs"
 import { perfil } from "../sandbox/profile.mjs"
 import { argv } from "../sandbox/bwrap.mjs"
 import { leerResultado, FORMATOS } from "./resultados.mjs"
+import { regresionDeSuite, esArchivoDeTest, testDeLinea } from "./regresion.mjs"
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const RAIZ = join(AQUI, "..", "..")
@@ -284,6 +285,62 @@ function controlCitas({ proyecto, texto }) {
     : hallazgo("citas", true, texto.length + " caracteres de informe", [])
 }
 
+// ── G3.5 · la suite de después no puede ser más flaca que la de antes ───────
+
+/**
+ * El control de la suite mira la foto de después, y esa foto está limpia cuando
+ * el agente borró justo los tests que le salieron en rojo. El dato que lo delata
+ * está en la diferencia, no en el estado final. El porqué entero, y el cableado
+ * que lo demostró aprobando código roto, están en `regresion.mjs`.
+ *
+ * Los archivos nuevos sin añadir al índice entran aquí por la misma razón que en
+ * el control de secretos: `git diff` no los ve, y sin ellos mover un test a un
+ * archivo recién creado parecería una baja.
+ */
+function controlRegresion({ proyecto, base, declarados }) {
+  const diff = git(proyecto, ["diff", "--relative", base])
+
+  const nuevos = []
+  for (const f of git(proyecto, ["ls-files", "--others", "--exclude-standard"]).split("\n").map((l) => l.trim()).filter(Boolean)) {
+    if (!esArchivoDeTest(f)) continue
+    try {
+      for (const linea of readFileSync(join(proyecto, f), "utf8").split("\n")) {
+        const t = testDeLinea(linea)
+        if (t?.nombre && !t.silencia) nuevos.push(t.nombre)
+      }
+    } catch {
+      // Ilegible. No se asume que traía el test que falta.
+    }
+  }
+
+  const r = regresionDeSuite({ diff, nuevos, declarados: declarados ?? [] })
+  const medido = { retirados: r.retirados, silenciados: r.silenciados }
+
+  if (!r.limpio) {
+    const lista = r.sinDeclarar.map((n) => `"${n}"`).join(", ")
+    return hallazgo(
+      "regresión",
+      false,
+      declarados ?? null,
+      medido,
+      `el cambio retira o silencia ${r.sinDeclarar.length} test(s) que el informe no declara: ${lista}. ` +
+        `Retirar un test puede estar bien; hacerlo en silencio deja la suite en verde por adelgazamiento. ` +
+        `Si es deliberado, el informe lo dice en "tests_retirados".`,
+    )
+  }
+
+  const dichos = (declarados ?? []).length
+  return hallazgo(
+    "regresión",
+    true,
+    declarados ?? null,
+    medido,
+    dichos
+      ? `${r.retirados.length + r.silenciados.length} test(s) retirados o silenciados, todos declarados`
+      : "ningún test retirado ni silenciado sin declarar",
+  )
+}
+
 // ── el veredicto ────────────────────────────────────────────────────────────
 
 /**
@@ -291,11 +348,13 @@ function controlCitas({ proyecto, texto }) {
  * @param {string} o.proyecto  árbol de trabajo a juzgar
  * @param {string} [o.base]    contra qué se compara el diff
  * @param {string[]} o.alcance globs que el agente tenía permitido tocar
- * @param {object} [o.informe] lo que el agente AFIRMA: { tests:{pasaron,fallaron}, texto }
+ * @param {object} [o.informe] lo que el agente AFIRMA:
+ *   { tests:{pasaron,fallaron}, archivos, texto, tests_retirados }
  */
 export function veredicto({ proyecto, base = "HEAD", alcance = [], informe = {}, comando, red = false }) {
   const controles = [
     controlSuite({ proyecto, afirmado: informe.tests ?? null, comando, red }),
+    controlRegresion({ proyecto, base, declarados: informe.tests_retirados ?? null }),
     controlAlcance({ proyecto, base, alcance, afirmado: informe.archivos ?? null }),
     controlSecretos({ proyecto, base }),
     controlCitas({ proyecto, texto: informe.texto }),
