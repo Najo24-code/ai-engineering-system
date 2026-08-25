@@ -113,14 +113,21 @@ una persona, todavía no un orquestador.
 **Entregable.** `core/verification/` — un verificador que corre *fuera* del agente
 y produce un veredicto con evidencia.
 
-**Gate.**
-- [ ] **G3.1** El verificador corre la suite él mismo; no lee lo que el agente dice de la suite.
-- [ ] **G3.2** Comprueba que el diff toca solo rutas permitidas.
-- [ ] **G3.3** Comprueba que no aparecieron secretos en el diff.
-- [ ] **G3.4** **Prueba del agente mentiroso.** Se simula un agente que reporta
+**Gate.** **Los cinco en verde — fase CERRADA el 2026-08-24.**
+- [x] **G3.1** El verificador corre la suite él mismo; no lee lo que el agente dice de la suite.
+- [x] **G3.2** Comprueba que el diff toca solo rutas permitidas.
+- [x] **G3.3** Comprueba que no aparecieron secretos en el diff.
+- [x] **G3.4** **Prueba del agente mentiroso.** Se simula un agente que reporta
       "214 tests pasaron" sobre un árbol donde los tests fallan. El verificador
       tiene que rechazarlo. Sin esta prueba la fase no cierra.
-- [ ] **G3.5** El veredicto se guarda con su evidencia y es reproducible.
+- [x] **G3.5** El veredicto se guarda con su evidencia y es reproducible.
+
+La fase entregó además una capa que el gate no pedía y que resultó ser su
+cimiento: **el recinto** (`core/sandbox/`, bubblewrap). Sin ella, el verificador
+tendría que correr la suite del agente con sus propios permisos, que es
+exactamente el agujero que dejó anotado la fase 2. Su banco de contención —13
+ataques deterministas, 4 controles positivos, 0 fugas, cero llamadas al modelo—
+está en `npm run gate:contencion`.
 
 **Auditoría.** `docs/audits/fase-3.md`
 
