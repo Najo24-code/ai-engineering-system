@@ -143,11 +143,13 @@ persona apretando el botón entre etapa y etapa.
 
 **Entregable.** `agents/review.agent.md` y el ciclo documentado con una corrida real.
 
-**Gate.**
-- [ ] **G4.1** REVIEW encuentra un defecto **plantado a propósito** en el trabajo de BUILD.
-- [ ] **G4.2** REVIEW no puede modificar código; solo dictamina.
-- [ ] **G4.3** El dictamen cita archivo y línea que existen de verdad.
-- [ ] **G4.4** Un rechazo de REVIEW devuelve el trabajo a BUILD y la segunda vuelta se completa.
+**Gate.** **ABIERTA** — 3 cerrados, 1 parcial, 1 bloqueado por la cuota del proveedor.
+- [x] **G4.1** REVIEW encuentra un defecto **plantado a propósito** en el trabajo de BUILD.
+- [~] **G4.2** REVIEW no puede modificar código; solo dictamina.
+      `write` contenido por permiso; **`edit` y `bash` SIN PROBAR** — el banco no
+      llegó a correrlos y lo declaró así en vez de darlos por buenos.
+- [x] **G4.3** El dictamen cita archivo y línea que existen de verdad.
+- [x] **G4.4** Un rechazo de REVIEW devuelve el trabajo a BUILD y la segunda vuelta se completa.
 - [ ] **G4.5** Una tarea real recorre el ciclo entero y termina en verde con evidencia.
 
 **Auditoría.** `docs/audits/fase-4.md`
