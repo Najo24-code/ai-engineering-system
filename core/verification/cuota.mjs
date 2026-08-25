@@ -39,10 +39,38 @@ export const CUOTA = {
   DISPONIBLE: "DISPONIBLE",
   AGOTADA: "AGOTADA",
   INDETERMINADA: "INDETERMINADA",
+  INSERVIBLE: "INSERVIBLE",
 }
 
 /** Lo que cuesta el modelo más barato: una petición, un token, cero contexto. */
 const SONDA = { max_tokens: 1, messages: [{ role: "user", content: "ok" }] }
+
+/**
+ * Los códigos en que el proveedor NO dudó: dijo que no.
+ *
+ * Solo dos, y la lista se quedó corta **después de medirla**, no antes.
+ *
+ * El motivo por el que existe: el 2026-08-25 `gemini-2.5-flash` devolvía 404 con
+ * el texto «no longer available to new users», la sonda lo leía como «cuota
+ * desconocida» y el relevo —cuya política ante la duda es arrancar a ciegas—
+ * ELEGÍA ese modelo, dejando además sin mirar las opciones siguientes de la
+ * escalera. Una señal negativa entrando como permiso.
+ *
+ * El motivo por el que **no** incluye al 403, que es la parte que costó: el
+ * primer intento metió 400 y 403 aquí «por simetría». Cablearlo contra el
+ * proveedor real lo desmintió en la misma sesión — `gemini-3.5-flash` dio 403 en
+ * 1 de cada 6 llamadas seguidas y 200 en las otras 5, con el mensaje «Gemini API
+ * has not been used in project … or it is disabled»: el coletazo de una
+ * credencial recién creada, que se arregla solo. Con el 403 en esta lista, un
+ * modelo perfectamente vivo se apagaba para siempre por un tropiezo de un
+ * segundo. **El modo de fallo que mata a un control es el que rechaza trabajo
+ * bueno**, y este control estuvo veinte minutos a un paso de tenerlo.
+ *
+ * Lo que queda son las dos respuestas que no dependen del reloj: la credencial
+ * no vale (401) o el modelo no existe (404). Todo lo demás —403, 5xx, un corte,
+ * un cuerpo ilegible— sigue siendo duda, y la duda se intenta.
+ */
+const TERMINALES = new Set([401, 404])
 
 /**
  * Lee el trío de cabeceras del proveedor, mire donde mire.
@@ -148,10 +176,29 @@ export async function sondearCuota({
     }
   }
 
+  if (TERMINALES.has(respuesta.status)) {
+    // 401 y 404. Aquí el proveedor no dudó: dijo que no. La credencial no vale o
+    // el modelo no existe, y ninguna de las dos se arregla esperando ni
+    // reintentando. Tratarlo como duda —que es lo que hacía este archivo— hace
+    // que quien pregunta reciba un «adelante» por una respuesta que significaba
+    // exactamente lo contrario.
+    return {
+      ...vacio(),
+      estado: CUOTA.INSERVIBLE,
+      limite,
+      restantes,
+      resetMs,
+      detalle:
+        (cuerpo?.error?.message ?? `el proveedor devolvió ${respuesta.status}`) +
+        ` (HTTP ${respuesta.status}: no es falta de cuota y no se arregla esperando)`,
+    }
+  }
+
   if (!respuesta.ok) {
-    // 401, 402, 5xx. Un fallo de credencial no es falta de cuota, y tratarlo
-    // como tal mandaría a esperar al reset por un problema que no se arregla
-    // esperando.
+    // 5xx y cualquier otro. Aquí sí es duda: un hipo del proveedor no puede
+    // apagar una opción que mañana funciona. Un fallo de credencial tampoco es
+    // falta de cuota, y tratarlo como tal mandaría a esperar al reset por un
+    // problema que no se arregla esperando.
     return {
       ...vacio(),
       limite,
@@ -190,6 +237,11 @@ function vacio() {
 export function alcanza(cuota, necesarias) {
   if (cuota.estado === CUOTA.AGOTADA) {
     return { sigue: false, motivo: `no queda cuota; se renueva ${cuandoVuelve(cuota.resetMs)}` }
+  }
+  if (cuota.estado === CUOTA.INSERVIBLE) {
+    // No es lo mismo que AGOTADA: no hay nada que esperar. Y no es lo mismo que
+    // INDETERMINADA: no hay nada que dudar.
+    return { sigue: false, motivo: `el proveedor rechaza esta opción: ${cuota.detalle}` }
   }
   if (cuota.estado === CUOTA.INDETERMINADA) {
     return { sigue: true, motivo: `cuota desconocida (${cuota.detalle}); se arranca a ciegas` }

@@ -61,11 +61,12 @@
       },
       {
         "proveedor": "google",
-        "id": "gemini-2.5-flash",
+        "id": "gemini-3.5-flash",
         "contexto": 1048576,
         "tool_calling": true,
         "estado": "DECLARADO",
-        "$nota": "Aquí decía `gemini-flash-latest`, que es el alias que el propio listado de Google anuncia. Medido el 2026-08-25 con curl y con fetch: ese alias NO responde — no da 404, se queda colgado sin contestar, y por eso `npm run relevo` se congelaba en el segundo agente. `gemini-2.5-flash` sí contesta (200 en 0,6 s). Sigue en DECLARADO: que el endpoint conteste no es que un agente haya corrido contra él."
+        "$medicion_2026_08_25": "De ocho ids de Google probados con la credencial de esta cuenta, este es el ÚNICO que sirve: 200, y `finish_reason: tool_calls` con la llamada bien formada, que es lo que hacía falta para poder escribir `tool_calling: true` sin inventarlo. `contexto` no sale de la documentación: lo dijo el proveedor en `/v1beta/models/gemini-3.5-flash` (`inputTokenLimit: 1048576`). Los otros siete: `gemini-flash-latest`, `gemini-3.6-flash` y `gemini-3.5-flash-lite` CUELGAN sin contestar; `gemini-2.5-flash` da 404 («no longer available to new users» — sirve con credenciales viejas y no con las nuevas, así que el id que funciona depende de la cuenta); `gemini-3.6-flash-lite` y `gemini-3.5-pro` dan 404; `gemini-3-flash-preview` da 403.",
+        "$por_que_sigue_en_declarado": "Que el endpoint conteste y sepa llamar a una herramienta no es que un agente haya trabajado contra él. Pasa a VERIFICADO con una corrida real del flujo, no antes."
       }
     ],
 
@@ -79,11 +80,11 @@
       },
       {
         "proveedor": "google",
-        "id": "gemini-2.5-flash",
+        "id": "gemini-3.5-flash",
         "contexto": 1048576,
         "tool_calling": true,
         "estado": "DECLARADO",
-        "$nota": "Aquí decía `gemini-flash-lite-latest`, otro alias `-latest` de los que cuelgan sin contestar. Debería ir un modelo más ligero que el de `nemotron-3-ultra`, pero el único ligero de Google que está MEDIDO es este mismo, así que se repite en vez de escribir un id sin comprobar: un id que no se sirve no falla, cuelga. Queda por medir `gemini-2.5-flash-lite`."
+        "$nota": "Aquí tocaría un modelo más ligero que el de `nemotron-3-ultra`, y se repite el mismo a propósito: los tres ligeros de Google que se probaron el 2026-08-25 o cuelgan (`gemini-3.5-flash-lite`, `gemini-flash-lite-latest`) o dan 404/403 (`gemini-3.6-flash-lite`, `gemini-2.5-flash-lite`). Repetir un id medido es peor solución que tener un ligero de verdad, pero es honesto; escribir uno sin comprobar no lo es, porque un id que el proveedor no sirve no da error: se cuelga."
       }
     ],
 

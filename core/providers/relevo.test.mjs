@@ -49,6 +49,7 @@ const catalogo = {
 const hay = { estado: "DISPONIBLE", detalle: "hay cuota" }
 const nada = { estado: "AGOTADA", detalle: "no queda cuota" }
 const nose = { estado: "INDETERMINADA", detalle: "sin red" }
+const rechazada = { estado: "INSERVIBLE", detalle: "404: el modelo ya no se sirve" }
 
 const env = { ALFA_KEY: "k1", BETA_KEY: "k2" }
 const sondeoFijo = (por) => async ({ proveedor }) => por[proveedor] ?? hay
@@ -149,6 +150,52 @@ test("la cuota se pregunta una vez por proveedor, no una por modelo", async () =
     },
   })
   assert.deepEqual(vistos, ["alfa", "beta"])
+})
+
+test("una opción que el proveedor rechaza se salta y se sigue bajando la escalera", async () => {
+  // Es la diferencia con la duda. Ante un "no sé" se intenta, porque intentarlo
+  // es la forma de averiguarlo. Ante un "no" ya no queda nada que averiguar:
+  // elegirla gastaría la corrida en algo que se sabe que falla y —peor— dejaría
+  // sin mirar las opciones que vienen detrás.
+  const r = await elegir({
+    catalogo,
+    idNeutral: "grande",
+    requisitos: REVIEW,
+    env,
+    sondear: sondeoFijo({ alfa: rechazada }),
+  })
+  assert.equal(firma(r.elegida), "beta/b-grande")
+  const saltada = r.bitacora.find((b) => b.modelo === "a-grande")
+  assert.equal(saltada.motivo, DESCARTE.INSERVIBLE)
+  assert.match(saltada.detalle, /404/)
+})
+
+test("el rechazo de un modelo no condena al siguiente del mismo proveedor", async () => {
+  // La caché de sondeos estaba puesta por PROVEEDOR, porque el tope de cuota es
+  // de cuenta. En cuanto una respuesta habla del modelo y no de la cuenta, esa
+  // clave miente: el 404 de `a-1` apagaba a `a-2`, que podía estar vivo.
+  const dosDelMismo = {
+    ...catalogo,
+    modelos: {
+      repes: [
+        { proveedor: "alfa", id: "a-1", contexto: 1000000, tool_calling: true },
+        { proveedor: "alfa", id: "a-2", contexto: 1000000, tool_calling: true },
+      ],
+    },
+  }
+  const preguntados = []
+  const r = await elegir({
+    catalogo: dosDelMismo,
+    idNeutral: "repes",
+    requisitos: REVIEW,
+    env,
+    sondear: async ({ modelo }) => {
+      preguntados.push(modelo)
+      return modelo === "a-1" ? rechazada : hay
+    },
+  })
+  assert.deepEqual(preguntados, ["a-1", "a-2"])
+  assert.equal(firma(r.elegida), "alfa/a-2")
 })
 
 test("la duda no cierra la puerta: se intenta y que lo diga la corrida", async () => {

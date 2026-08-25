@@ -40,6 +40,7 @@ export const DESCARTE = {
   SIN_CREDENCIAL: "no hay credencial en el entorno",
   SIN_CUOTA: "el proveedor no tiene cuota",
   PROVEEDOR_DESCONOCIDO: "el proveedor no está en el catálogo",
+  INSERVIBLE: "el proveedor rechaza esta opción",
 }
 
 /**
@@ -118,7 +119,11 @@ export async function elegir({ catalogo, idNeutral, requisitos = {}, env = proce
     }
   }
 
-  const cuotaDe = new Map()
+  // La clave lleva el modelo, no solo el proveedor. La cuota es de la cuenta,
+  // pero «este modelo no existe» es del modelo: con la clave puesta solo en el
+  // proveedor, el 404 de una opción se le aplicaba a la siguiente del mismo
+  // proveedor, que podía estar perfectamente viva.
+  const sondeos = new Map()
 
   for (const opcion of aptas) {
     const proveedor = catalogo.proveedores?.[opcion.proveedor]
@@ -144,13 +149,38 @@ export async function elegir({ catalogo, idNeutral, requisitos = {}, env = proce
       continue
     }
 
-    if (!cuotaDe.has(opcion.proveedor)) {
-      cuotaDe.set(
-        opcion.proveedor,
-        await sondear({ proveedor: opcion.proveedor, endpoint: proveedor.endpoint, apiKey, modelo: opcion.id }),
+    // El atajo que conserva el ahorro: la cuota es de la CUENTA, así que si un
+    // modelo de este proveedor ya dijo "agotada", los demás lo están también y
+    // preguntarlo otra vez es gastar una petición para saber lo mismo. Lo que
+    // NO se puede heredar entre modelos es el rechazo: "este modelo no existe"
+    // habla de un modelo, no del proveedor.
+    const clave = `${opcion.proveedor}/${opcion.id}`
+    const agotadoYa = [...sondeos.entries()].find(
+      ([k, v]) => k.startsWith(`${opcion.proveedor}/`) && v.estado === "AGOTADA",
+    )
+    if (!sondeos.has(clave)) {
+      sondeos.set(
+        clave,
+        agotadoYa
+          ? agotadoYa[1]
+          : await sondear({ proveedor: opcion.proveedor, endpoint: proveedor.endpoint, apiKey, modelo: opcion.id }),
       )
     }
-    const cuota = cuotaDe.get(opcion.proveedor)
+    const cuota = sondeos.get(clave)
+
+    if (cuota.estado === "INSERVIBLE") {
+      // El proveedor no dudó: dijo que no. Seguir con esta opción es gastar la
+      // corrida en algo que ya se sabe que falla, y —peor— dejar sin mirar las
+      // opciones que vienen detrás en la escalera.
+      bitacora.push({
+        proveedor: opcion.proveedor,
+        modelo: opcion.id,
+        resultado: "saltada",
+        motivo: DESCARTE.INSERVIBLE,
+        detalle: cuota.detalle,
+      })
+      continue
+    }
 
     if (cuota.estado === "AGOTADA") {
       bitacora.push({

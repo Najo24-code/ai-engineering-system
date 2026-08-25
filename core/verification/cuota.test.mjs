@@ -94,14 +94,92 @@ test("200 sin cabecera es DISPONIBLE con cantidad desconocida, no con un número
 
 test("una credencial rechazada NO es falta de cuota", async () => {
   // Confundirlas mandaría a esperar al reset diario por un problema que no se
-  // arregla esperando: mañana la credencial seguirá siendo inválida.
+  // arregla esperando: mañana la credencial seguirá siendo inválida. Tampoco es
+  // duda —el proveedor no dudó— y por eso el estado es INSERVIBLE y no
+  // INDETERMINADA, que es lo que devolvía hasta el 2026-08-25.
   const c = await sondearCuota({
     apiKey: "k",
     modelo: "m",
     fetchImpl: fetchQueDevuelve(respuesta({ status: 401, cuerpo: { error: { message: "Invalid API key" } } })),
   })
-  assert.equal(c.estado, CUOTA.INDETERMINADA)
+  assert.equal(c.estado, CUOTA.INSERVIBLE)
+  assert.notEqual(c.estado, CUOTA.AGOTADA)
   assert.match(c.detalle, /Invalid API key/)
+})
+
+// ── el proveedor que no duda ─────────────────────────────────────────────────
+
+test("un modelo retirado da 404 y eso es un NO, no un no-sé", async () => {
+  // El cuerpo es el que devolvió Google AI Studio el 2026-08-25, literal. La
+  // sonda lo leía como "cuota desconocida" y el relevo, cuya política ante la
+  // duda es arrancar a ciegas, ELEGÍA este modelo: una señal negativa entrando
+  // como permiso, que es el fallo exacto que este repositorio existe para no
+  // cometer.
+  const c = await sondearCuota({
+    apiKey: "k",
+    modelo: "gemini-2.5-flash",
+    fetchImpl: fetchQueDevuelve(
+      respuesta({
+        status: 404,
+        cuerpo: {
+          error: {
+            code: 404,
+            message: "This model models/gemini-2.5-flash is no longer available to new users.",
+            status: "NOT_FOUND",
+          },
+        },
+      }),
+    ),
+  })
+  assert.equal(c.estado, CUOTA.INSERVIBLE)
+  assert.match(c.detalle, /no longer available/)
+})
+
+test("el 403 de una credencial recién creada es duda, no sentencia", async () => {
+  // Cuerpo real de Google AI Studio, capturado el 2026-08-25. Ese día
+  // `gemini-3.5-flash` lo devolvió en 1 de cada 6 llamadas seguidas y contestó
+  // 200 en las otras 5: es el coletazo de una key nueva, se arregla solo. Estuvo
+  // en la lista de terminales durante veinte minutos y habría apagado para
+  // siempre al único modelo del proveedor que funcionaba.
+  const c = await sondearCuota({
+    apiKey: "k",
+    modelo: "gemini-3.5-flash",
+    fetchImpl: fetchQueDevuelve(
+      respuesta({
+        status: 403,
+        cuerpo: {
+          error: {
+            code: 403,
+            message:
+              "Gemini API has not been used in project 1066335340582 before or it is disabled. Enable it by visiting ...",
+          },
+        },
+      }),
+    ),
+  })
+  assert.equal(c.estado, CUOTA.INDETERMINADA)
+  assert.notEqual(c.estado, CUOTA.INSERVIBLE)
+})
+
+test("un 500 SIGUE siendo duda: un hipo del proveedor no apaga una opción", async () => {
+  // El límite del control, escrito. Si cualquier respuesta no-200 apagara la
+  // opción, un rato malo del proveedor la borraría del catálogo efectivo. El
+  // modo de fallo que mata a un control es el que rechaza trabajo bueno.
+  const c = await sondearCuota({
+    apiKey: "k",
+    modelo: "m",
+    fetchImpl: fetchQueDevuelve(respuesta({ status: 503, cuerpo: { error: { message: "overloaded" } } })),
+  })
+  assert.equal(c.estado, CUOTA.INDETERMINADA)
+  assert.notEqual(c.estado, CUOTA.INSERVIBLE)
+})
+
+test("ante un INSERVIBLE no se arranca, y el motivo no manda a esperar", async () => {
+  // Distinto de AGOTADA en lo único que importa al que lee: ahí no hay reset que
+  // valga. Decir "espera al reset" ante un 404 manda a esperar para siempre.
+  const r = alcanza({ estado: CUOTA.INSERVIBLE, detalle: "404 NOT_FOUND", resetMs: null }, 9)
+  assert.equal(r.sigue, false)
+  assert.doesNotMatch(r.motivo, /renueva|reset/i)
 })
 
 test("sin red la sonda dice que no sabe, no que hay cuota", async () => {
