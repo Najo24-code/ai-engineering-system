@@ -90,7 +90,7 @@ const diff = execFileSync("git", ["-C", CWD, "diff", "--relative"], {
 })
 guardar("cambios.diff", diff)
 
-const registro = join(CWD, ".policy-gate.jsonl")
+const registro = join(CWD, ".opencode", "policy-gate.jsonl")
 if (existsSync(registro)) copyFileSync(registro, join(VUELTA, "policy-gate.jsonl"))
 
 console.log(`\nEvidencia en ${corrida}/vuelta-2/`)

@@ -31,7 +31,12 @@ import { decidir } from "../../../core/policies/policy.mjs"
 type Contrato = { write: string[]; shell: string[] }
 
 const ARCHIVO_ALCANCES = "scopes.generated.json"
-const REGISTRO = ".policy-gate.jsonl"
+// Dentro de `.opencode/`, no en la raíz del proyecto. En la raíz quedaba fuera
+// del `.gitignore` que deja el instalador —que solo cubre `.opencode/*`— y el
+// repositorio ajeno se llenaba de un archivo sin versionar que el control de
+// alcance lee, con toda la razón, como "un agente tocó algo que no declaró". El
+// sistema instalándose y saboteando al proyecto que venía a ayudar.
+const REGISTRO = ".opencode/policy-gate.jsonl"
 
 export const PolicyGate = async ({ directory }: any) => {
   const raiz: string = directory

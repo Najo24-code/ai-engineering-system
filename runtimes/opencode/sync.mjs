@@ -16,8 +16,11 @@
  */
 
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+
+import { coincideGlob } from "../../core/policies/policy.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -43,6 +46,50 @@ const PROYECTO = (() => {
 })()
 
 const TARGET_DIR = join(PROYECTO, ".opencode", "agents")
+
+/**
+ * Dónde puede escribir BUILD **en ESTE proyecto**, y con qué comprueba su trabajo.
+ *
+ * El contrato de agente traía `src/**` y `npm test` metidos a pelo. Sonaban
+ * universales y no lo eran: son la forma de `lab/`, que es un proyecto de Node
+ * con `src/`. Instalado el 2026-08-25 en yunque —que es Python y guarda todo en
+ * `server/`— el gate negó la PRIMERA escritura de BUILD y todas las siguientes,
+ * con un motivo impecable: «"server/detectores.py" está fuera del alcance
+ * declarado (src/**, tests/**)». El sistema funcionaba perfectamente y no servía
+ * para nada.
+ *
+ * La corrección no es aflojar el alcance: es reconocer de quién es. **Dónde vive
+ * el código es una propiedad del proyecto, no del rol del agente.** El contrato
+ * declara la intención —«escribe donde vive el código y su prueba», «los comandos
+ * son los de verificar, no los de instalar»— y la instalación es la que ata esa
+ * intención a rutas y comandos concretos.
+ *
+ * Lo que NO se toca por aquí son los comandos de solo mirar (`git status`,
+ * `git diff`, `git log`): esos sí son iguales en todas partes.
+ */
+const lista = (bandera) => {
+  const i = process.argv.indexOf(bandera)
+  if (i === -1) return null
+  const v = process.argv[i + 1]
+  if (!v || v.startsWith("--")) {
+    console.error(`${bandera} necesita un valor, separado por comas`)
+    process.exit(2)
+  }
+  return v.split(",").map((x) => x.trim()).filter(Boolean)
+}
+const ALCANCE = lista("--alcance")
+const COMANDOS = lista("--comandos")
+
+/** Los archivos que el proyecto de verdad versiona, para poder contrastar. */
+function archivosDelProyecto() {
+  try {
+    return execFileSync("git", ["-C", PROYECTO, "ls-files"], { encoding: "utf8" })
+      .split("\n")
+      .filter(Boolean)
+  } catch {
+    return null
+  }
+}
 
 /**
  * El frontmatter solo sabe decir sí o no por herramienta. Para BUILD eso no
@@ -225,7 +272,12 @@ const rendered = ids.map((id) => {
     fail(id, `declara comandos en scope.shell pero no tiene la herramienta bash`)
   }
 
-  scopes[id] = { write: contract.scope.write, shell: contract.scope.shell }
+  const write = ALCANCE && contract.scope.write.length ? ALCANCE : contract.scope.write
+  const shell =
+    COMANDOS && contract.scope.shell.length
+      ? [...COMANDOS, ...contract.scope.shell.filter((c) => c.startsWith("git "))]
+      : contract.scope.shell
+  scopes[id] = { write, shell }
   return { id, out: render(contract, id) }
 })
 
@@ -240,6 +292,29 @@ const scopesOut =
     null,
     2,
   ) + "\n"
+
+/**
+ * Un alcance que no encaja con NINGÚN archivo del proyecto no es una instalación
+ * que funcione: es una que se descubre rota tres minutos después, en mitad de una
+ * corrida, con el gate negando escritura tras escritura por un motivo que suena
+ * a que el agente se está portando mal. Cuesta cero comprobarlo aquí.
+ *
+ * Avisa, no impide. Un patrón puede apuntar legítimamente a algo que todavía no
+ * existe —un directorio que esta misma tarea va a crear— y un instalador que se
+ * negara a instalar por eso sería otra vez el control que rechaza trabajo bueno.
+ */
+const versionados = archivosDelProyecto()
+const huerfanos = []
+if (versionados) {
+  for (const [id, s] of Object.entries(scopes)) {
+    for (const patron of s.write) {
+      // El patrón va PRIMERO: `coincideGlob(patron, ruta)`. Invertirlo no da error,
+      // da `false` siempre — y un control que siempre dice "no encaja" se convierte
+      // en ruido que se aprende a ignorar, que es como muere un aviso.
+      if (!versionados.some((f) => coincideGlob(patron, f))) huerfanos.push({ id, patron })
+    }
+  }
+}
 
 if (problems.length) {
   console.error("El contrato no es válido para este runtime:")
@@ -316,5 +391,18 @@ if (drift) {
   console.error(`\n${drift} agente(s) desincronizado(s). Corre sync.mjs sin --check.`)
   process.exit(1)
 }
+if (huerfanos.length) {
+  console.log(`\n🔴 El alcance de escritura no encaja con este proyecto:`)
+  for (const h of huerfanos) {
+    console.log(`  ${h.id}: "${h.patron}" no coincide con ningún archivo versionado`)
+  }
+  console.log(
+    `\n  Tal cual, el gate negará TODA escritura y la corrida morirá sin tocar nada,\n` +
+      `  con un motivo que parece culpa del agente. Dónde vive el código lo sabe este\n` +
+      `  proyecto, no el contrato:\n\n` +
+      `    node runtimes/opencode/sync.mjs --en ${PROYECTO} --alcance "<ruta>/**" --comandos "<cómo se corren las pruebas>"\n`,
+  )
+}
+
 console.log(`\n${ids.length} agente(s) sincronizado(s) con ${RT.runtime} ${RT.verified_version}.`)
 if (!check) console.log(`Instalado en: ${PROYECTO}/.opencode/`)

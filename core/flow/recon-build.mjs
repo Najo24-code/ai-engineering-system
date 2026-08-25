@@ -148,7 +148,7 @@ console.log("listo")
 const diff = gitDiff()
 guardar("cambios.diff", diff)
 
-const registroGate = join(CWD, ".policy-gate.jsonl")
+const registroGate = join(CWD, ".opencode", "policy-gate.jsonl")
 if (existsSync(registroGate)) copyFileSync(registroGate, join(SALIDA, "policy-gate.jsonl"))
 
 const archivos = diff
