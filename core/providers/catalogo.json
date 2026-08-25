@@ -26,8 +26,11 @@
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       "prefijo_runtime": "google/",
       "cuota": {
-        "tipo": "diaria_por_cuenta",
-        "$nota": "Google AI Studio tiene capa gratuita propia. El tope depende del modelo y de la cuenta, así que aquí no se escribe un número que no se ha medido."
+        "tipo": "diaria_por_modelo_y_proyecto",
+        "gratis_por_dia": 20,
+        "$medido": "20 peticiones al día, por modelo y por proyecto. Medido el 2026-08-25 contra el 429 del propio proveedor: `quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue: 20`.",
+        "$el_mensaje_miente": "El texto del mismo 429 dice «Please retry in 48.938334489s». Un runner que leyera el mensaje —que es lo legible por humanos, y por tanto lo que uno mira primero— se quedaría reintentando cada 48 segundos hasta mañana. El dato bueno está en `details[].violations[].quotaId`, no en la frase. Es el mismo patrón que el 429 de OpenRouter, donde las cabeceras viajaban dentro del cuerpo: en los dos casos el proveedor dice la verdad en un sitio y algo más cómodo de leer en otro.",
+        "$consecuencia": "20 al día no alcanza para un RECON, que gasta una petición por cada llamada a herramienta. Google sirve para sondear, para tareas de una sola respuesta y como relevo cuando OpenRouter se agota, pero hoy NO sostiene una corrida completa del flujo. Que el tope sea por MODELO y por PROYECTO es la única palanca: dos modelos servibles serían dos cupos, y otra credencial de otro proyecto, otro más."
       },
       "estado": "DECLARADO",
       "evidencia": "models.dev lo lista con env GEMINI_API_KEY y 16 modelos con tool calling y contexto de hasta 1M. Nunca se ha corrido un agente contra él: hace falta una credencial."
