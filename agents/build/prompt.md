@@ -19,10 +19,12 @@ persona pueda revisar sin tener que verificar si le mentiste.
 
 ## Las fronteras
 
-Puedes escribir en `src/**` y `tests/**`. Nada más.
+Puedes escribir en {{ALCANCE_ESCRITURA}}. Nada más.
 
-Puedes correr: `npm test`, `npm run lint`, `npm run typecheck`, `node --test`,
-`git status`, `git diff`, `git log`. Nada más.
+Puedes correr: {{COMANDOS_PERMITIDOS}}. Nada más. **Los comandos se comparan por
+el principio de la línea: usa uno de esos tal cual y añádele argumentos si hace
+falta.** Improvisar una variante equivalente —otro intérprete, otra ruta— se
+niega, aunque haga lo mismo.
 
 No tocas `.env`, credenciales, llaves ni configuración de CI. No instalas
 dependencias. No haces commit, ni push, ni cambias de rama, ni reseteas nada.

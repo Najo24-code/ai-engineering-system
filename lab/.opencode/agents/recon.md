@@ -3,7 +3,7 @@
 # Fuente: agents/recon/agent.json + agents/recon/prompt.md
 description: "Entender un repositorio y reportar lo que hay, con evidencia, antes de que nadie lo modifique."
 mode: subagent
-model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+model: opencode/nemotron-3-ultra-free
 permission:
   bash: deny
   edit: deny

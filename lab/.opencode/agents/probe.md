@@ -3,7 +3,7 @@
 # Fuente: agents/probe/agent.json + agents/probe/prompt.md
 description: "Delegar una prueba de frontera a otro agente y reportar lo que ocurrió, sin capacidad propia de actuar."
 mode: primary
-model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+model: opencode/nemotron-3-ultra-free
 permission:
   bash: deny
   edit: deny

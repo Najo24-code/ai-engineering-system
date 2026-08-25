@@ -3,7 +3,7 @@
 # Fuente: agents/build/agent.json + agents/build/prompt.md
 description: "Implementar el cambio pedido dentro de un alcance declarado, dejando la verificación en verde y contando la verdad de lo que hizo."
 mode: subagent
-model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+model: opencode/nemotron-3-ultra-free
 permission:
   task: deny
   webfetch: deny

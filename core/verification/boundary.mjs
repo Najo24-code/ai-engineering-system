@@ -36,6 +36,9 @@ import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { correrAgente, ordenDelegada, FALLO } from "./runner.mjs"
 import { sondearCuota, alcanza, costoMedido, cuandoVuelve, CUOTA } from "./cuota.mjs"
+const CATALOGO = JSON.parse(
+  readFileSync(new URL("../providers/catalogo.json", import.meta.url), "utf8"),
+)
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -142,19 +145,43 @@ const PETICIONES_POR_CORRIDA = 6
 const tools = onlyTool ? [onlyTool] : Object.keys(probes)
 const corridasPrevistas = tools.filter((t) => probes[t]).length * 3
 
-/** El modelo que el agente declara, traducido al id que espera la API. */
-function modeloDelAgente(id) {
+/**
+ * El modelo que el agente declara, y de qué proveedor sale.
+ *
+ * Esto daba por hecho que el proveedor era OpenRouter: quitaba el prefijo
+ * `openrouter/` a pelo y sondeaba la cuota contra su endpoint. Con el relevo
+ * eligiendo otro (opencode-zen, el 2026-08-25) el banco preguntaba a OpenRouter
+ * por un modelo de Zen y recibía "not a valid model ID". Seguía adelante —que es
+ * lo correcto ante una duda— pero anunciaba «cuota desconocida» cuando la verdad
+ * era «no estamos corriendo contra ese proveedor». Un mensaje que describe mal el
+ * mundo se acaba creyendo.
+ */
+function proveedorYModelo(id) {
   const src = readFileSync(join(AGENT_DIR, `${id}.md`), "utf8")
-  return /^model: (.*)$/m.exec(src)[1].trim().replace(/^openrouter\//, "")
+  const completo = /^model: (.*)$/m.exec(src)[1].trim()
+  const prefijo = `${completo.split("/")[0]}/`
+  const entrada = Object.entries(CATALOGO.proveedores).find((p) => p[1].prefijo_runtime === prefijo)
+  return {
+    modelo: completo.slice(prefijo.length),
+    proveedor: entrada?.[1] ?? null,
+    nombre: entrada?.[0] ?? completo.split("/")[0],
+  }
 }
 
 // Preflight. Cuesta UNA petición cuando hay cuota y CERO cuando no la hay, que
 // es justo al revés de lo que costaría descubrirlo corriendo el banco.
-const modelo = modeloDelAgente(agentId)
-const antes = await sondearCuota({ apiKey: process.env.OPENROUTER_API_KEY, modelo })
+const { modelo, proveedor, nombre: nombreProveedor } = proveedorYModelo(agentId)
+const credencial = proveedor?.credencial ? process.env[proveedor.credencial] : null
+
+// A un proveedor cuya llave vive en el almacén del runtime no se le puede
+// preguntar desde aquí. Eso es un no-sé de verdad, no una cuota agotada, y se
+// dice con su motivo en vez de inventarle un sondeo que no se puede hacer.
+const antes = proveedor?.credencial
+  ? await sondearCuota({ apiKey: credencial, modelo, url: proveedor.endpoint })
+  : { estado: CUOTA.INDETERMINADA, limite: null, restantes: null, resetMs: null, detalle: `la credencial de "${nombreProveedor}" la tiene el runtime, no el entorno` }
 const puerta = alcanza(antes, corridasPrevistas * PETICIONES_POR_CORRIDA)
 
-console.log(`Cuota: ${antes.estado} — ${puerta.motivo}`)
+console.log(`Cuota (${nombreProveedor}): ${antes.estado} — ${puerta.motivo}`)
 if (!puerta.sigue) {
   console.error(
     `\nEl banco no arranca. ${corridasPrevistas} corridas necesitan ~${corridasPrevistas * PETICIONES_POR_CORRIDA} peticiones.` +
@@ -243,7 +270,9 @@ for (const r of results) {
 // para la próxima vez. Es la misma regla que el resto del proyecto: lo que no se
 // puede medir no pasa.
 const corridasHechas = results.filter((r) => r.verdict !== "SIN SONDA" && r.verdict !== "SIN CORRIDA").length * 3
-const despues = await sondearCuota({ apiKey: process.env.OPENROUTER_API_KEY, modelo })
+const despues = proveedor?.credencial
+  ? await sondearCuota({ apiKey: credencial, modelo, url: proveedor.endpoint })
+  : { ...antes }
 const gasto = costoMedido(antes, despues)
 
 if (gasto != null && corridasHechas) {

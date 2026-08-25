@@ -3,7 +3,7 @@
 # Fuente: agents/review/agent.json + agents/review/prompt.md
 description: "Juzgar el trabajo de BUILD contra la tarea que se pidió y emitir un dictamen con defectos citados, sin tocar una sola línea de código."
 mode: subagent
-model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+model: opencode/nemotron-3-ultra-free
 permission:
   bash: deny
   edit: deny

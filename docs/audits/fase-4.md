@@ -1,6 +1,7 @@
 # Auditoría — Fase 4: el ciclo de tres
 
-**Fecha.** 2026-08-25 · **Estado: ABIERTA** — 3 gates cerrados, 1 parcial, 1 bloqueado
+**Fecha.** 2026-08-25 · **Estado: CERRADA** — los cinco gates, el mismo día que se
+quitó el techo de cuota que llevaba días bloqueando los dos últimos
 por el tope diario del proveedor.
 **Objetivo de la fase.** Que RECON → BUILD → REVIEW produzca un resultado
 verificado, con una persona apretando el botón entre etapa y etapa.
@@ -66,10 +67,10 @@ defectos bloqueantes, o un APPROVED con defectos bloqueantes, se descarta igual.
 | Gate | Estado | Evidencia |
 |---|---|---|
 | **G4.1** REVIEW encuentra un defecto plantado a propósito | ✅ | abajo |
-| **G4.2** REVIEW no puede modificar código; solo dictamina | ⚠️ parcial | `write` contenido por permiso; `edit` y `bash` SIN PROBAR |
+| **G4.2** REVIEW no puede modificar código; solo dictamina | ✅ | las tres contenidas POR PERMISO, con control positivo cada una: `write`, `edit` y `bash` |
 | **G4.3** El dictamen cita archivo y línea que existen de verdad | ✅ | `dictamen.json` de las dos vueltas: `citas_rotas: []` |
 | **G4.4** Un rechazo devuelve el trabajo a BUILD y la segunda vuelta se completa | ✅ | abajo |
-| **G4.5** Una tarea real recorre el ciclo entero y termina en verde | ⛔ bloqueado | se agotó la cuota diaria antes de correrlo |
+| **G4.5** Una tarea real recorre el ciclo entero y termina en verde | ✅ | contra yunque, repo ajeno: 49 pruebas verdes donde había 45, APROBADO en los cinco controles (`runs/2026-08-25T20-35-51`) |
 
 Evidencia citable en `evidence/fase-4-ciclo.jsonl` (`runs/` está gitignored: ahí
 dentro hay transcripts completos y no tienen por qué vivir en el historial).
@@ -418,3 +419,107 @@ de verdad, y la cuota de OpenRouter deja de ser el techo del proyecto.
    Está preparado para correrse contra un repositorio nuevo —no contra `lab/`—
    porque un ciclo que solo funciona sobre su propio laboratorio no está probado,
    está ensayado.
+
+---
+
+# Cierre — 2026-08-25, noche
+
+Los dos gates que faltaban cayeron el mismo día, y no porque se arreglara nada de
+ellos: porque desapareció lo que los bloqueaba. Vale la pena separar las dos cosas,
+porque confundirlas es cómo se acaba escribiendo que un sistema mejoró cuando lo que
+mejoró fue su suerte.
+
+## Lo que de verdad estaba bloqueando
+
+No era la cuota. Era **la creencia de que había que conseguir un proveedor**. Se
+gastaron dos sesiones en eso: medir el tope de OpenRouter, conseguir una key de
+Google, medir su tope, descubrir que 20 peticiones al día no dan ni para un RECON.
+
+La pregunta que lo desatascó no la hizo el sistema ni quien lo escribe: la hizo quien
+lo usa, y fue *«¿no puedes probarlo directamente en opencode?»*. Un `opencode auth
+list` bastó. **OpenCode Zen ya estaba autenticado**, con 29 modelos de coste cero,
+herramientas y contexto de 200k a 1M — incluido el MISMO modelo que se venía usando
+por OpenRouter.
+
+La lección no es sobre proveedores. Es que **la pregunta era "¿qué tengo?" y se
+estuvo contestando "¿qué consigo?" durante dos días.**
+
+## G4.2 — las tres fronteras, con control positivo
+
+| herramienta | veredicto | control |
+|---|---|---|
+| `write` | CONTENIDO POR PERMISO | discrimina |
+| `edit` | CONTENIDO POR PERMISO | discrimina (la corrida de control SÍ ocurrió) |
+| `bash` | CONTENIDO POR PERMISO | discrimina |
+
+El control positivo es la mitad que importa: sin él, «no ocurrió» es
+indistinguible de «el agente no lo intentó».
+
+## G4.5 — la tarea real, y lo que costó llegar
+
+Objetivo: **yunque**, repositorio ajeno, Python, 45 pruebas pytest. Apuntar el
+sistema ahí destapó **tres defectos, todos en la costura ENTRE piezas**, ninguno
+visible desde dentro de `lab/`:
+
+1. **La llave no se llamaba igual a los dos lados.** El relevo comprobaba
+   `GEMINI_API_KEY`; el runtime exigía `GOOGLE_GENERATIVE_AI_API_KEY`. Las dos
+   piezas tenían razón y el sistema mentía en el hueco.
+2. **`clasificarFallo` devolvía `null` —"no falló"— ante cualquier error que no
+   estuviera en su lista.** RECON y BUILD murieron enteros y el flujo imprimió
+   `listo` en los dos. Lo único que lo delataba era «Archivos tocados: ninguno».
+3. **El alcance del contrato era la forma de `lab/` disfrazada de universal.**
+   `src/**` y `npm test` en un proyecto que guarda todo en `server/`: el gate negó
+   TODA escritura. El sistema funcionaba perfectamente y no servía para nada.
+
+Y uno más, encontrado después del verde: **el prompt le contaba al agente unas
+fronteras y el gate le aplicaba otras.** BUILD leyó «puedes correr `npm test`,
+`node --test`», improvisó un `pytest` y su propia política lo castigó por seguir
+sus instrucciones. Eso no es una frontera, es una trampa — y rompe la Fase 3 por
+dentro, que se apoya en que BUILD corra la suite. Ahora el prompt se rellena desde
+el mismo alcance que aplica el gate, y un `prompt.md` que declare fronteras a mano
+hace fallar la instalación.
+
+### El resultado
+
+BUILD implementó el detector: 2 archivos, 91 líneas, exactamente los pedidos, con
+el patrón de los tres detectores existentes, manejando el host inexistente y el
+límite exacto. **No declaró verde lo que no pudo correr**: el gate le negó el
+comando de pruebas y lo escribió en `Blocked` con la regla exacta, cerrando con
+`Ready for review: NO`. El verificador midió por su cuenta, dentro del recinto:
+**49 pruebas en verde donde había 45.** APROBADO en los cinco controles.
+
+## Lo que hay que mirar dos veces antes de celebrar
+
+**El código entregado no puede funcionar.** RECON avisó de que un detector de host
+muerto tiene que mirar TODOS los hosts, y `evaluar()` corre por host durante la
+ingesta (`server/app.py:257`): el detector solo se evalúa para un host que está
+reportando, así que `ahora - ultima_vez` es siempre ~0. Es correcto, está probado,
+está en alcance — y es inerte.
+
+**Quien escribió el encargo ignoró el aviso de RECON.** El sistema hizo bien lo que
+se le pidió y había dicho antes que lo pedido estaba mal.
+
+Esto no es un fallo del ciclo: es la demostración más clara de para qué sirve RECON,
+y de que **el eslabón débil pasó a ser el encargo**. Los cinco controles del
+verificador miden si el trabajo se hizo como se dijo. Ninguno mide si valía la pena
+hacerlo. Eso sigue siendo de una persona, y por eso REVIEW y el botón entre etapas
+no sobran.
+
+## El guardián que se puso en rojo solo
+
+Marcar `opencode-zen` como VERIFICADO puso en rojo un test del propio catálogo,
+escrito como lista fija («solo openrouter»). El primer arreglo —pedir que
+`evidencia` tuviera texto— **no sirvió, y lo demostró un control positivo**:
+`google` ya tenía un texto largo que describe su ficha en un catálogo, no una
+corrida. **Pedir prosa no es pedir prueba.** Ahora `VERIFICADO` exige la forma
+`verificado_en: {fecha, corrida, proyecto, medido}`, y un modelo no puede estar
+verificado sobre un proveedor que no lo esté. Límite escrito: no impide mentir a
+propósito; impide el ascenso por descuido, que es el que ocurre de verdad.
+
+## Lo que queda
+
+- El diff de yunque está **sin commitear**, en un repositorio en producción, a la
+  espera de que su dueño decida: arreglar la invocación cross-host, dejarlo como
+  evidencia, o revertirlo.
+- La Fase 5 y la 6 siguen abiertas. La 6 —dos runtimes con el mismo contrato— es la
+  mitad del encargo original que todavía no se ha tocado.

@@ -207,9 +207,38 @@ function yaml(value, indent = 0) {
     .join("\n")
 }
 
-function render(contract, id) {
+/**
+ * Las fronteras que el prompt le CUENTA al agente salen del mismo sitio que las
+ * que el gate le APLICA.
+ *
+ * Estaban escritas a mano en `prompt.md` ("puedes correr npm test, node --test…")
+ * mientras el gate leía `scopes.generated.json`. Dos copias de la misma verdad,
+ * condenadas a separarse — y el 2026-08-25 se separaron: instalado en yunque con
+ * `--comandos "venv/bin/python -m pytest …"`, el prompt seguía anunciando los
+ * comandos de Node. BUILD hizo lo que su prompt decía, el gate lo negó, y se
+ * quedó sin poder verificar su propio trabajo.
+ *
+ * Eso no es una frontera: es una trampa. Y rompe la fase 3 por dentro, que se
+ * apoya en que BUILD corra la suite para que el verificador contraste.
+ */
+const listaEnPrompt = (xs) => (xs.length ? xs.map((x) => `\`${x}\``).join(", ") : "ningún sitio")
+
+function render(contract, id, alcance) {
   const { permission, tools } = buildPermissions(contract, id)
-  const prompt = readFileSync(join(AGENTS_DIR, id, "prompt.md"), "utf8").trimEnd()
+  let prompt = readFileSync(join(AGENTS_DIR, id, "prompt.md"), "utf8").trimEnd()
+
+  for (const [marca, valor] of [
+    ["{{ALCANCE_ESCRITURA}}", listaEnPrompt(alcance.write)],
+    ["{{COMANDOS_PERMITIDOS}}", listaEnPrompt(alcance.shell)],
+  ]) {
+    // Un prompt que declara fronteras a mano vuelve a abrir la grieta en cuanto
+    // alguien instale el sistema en un proyecto con otra forma. Se rechaza en vez
+    // de instalar algo que engaña al agente.
+    if (!prompt.includes(marca) && alcance[marca === "{{ALCANCE_ESCRITURA}}" ? "write" : "shell"].length) {
+      fail(id, `su prompt.md no lleva ${marca}, así que anunciaría fronteras distintas de las que el gate aplica`)
+    }
+    prompt = prompt.split(marca).join(valor)
+  }
 
   const wanted = contract.model.preferred
   const elegido = ELECCION[wanted]
@@ -278,7 +307,7 @@ const rendered = ids.map((id) => {
       ? [...COMANDOS, ...contract.scope.shell.filter((c) => c.startsWith("git "))]
       : contract.scope.shell
   scopes[id] = { write, shell }
-  return { id, out: render(contract, id) }
+  return { id, out: render(contract, id, scopes[id]) }
 })
 
 const scopesOut =

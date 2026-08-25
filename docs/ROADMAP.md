@@ -163,14 +163,19 @@ persona apretando el botón entre etapa y etapa.
 
 **Entregable.** `agents/review.agent.md` y el ciclo documentado con una corrida real.
 
-**Gate.** **ABIERTA** — 3 cerrados, 1 parcial, 1 bloqueado por la cuota del proveedor.
+**Gate.** **CERRADA** — los cinco, el 2026-08-25.
 - [x] **G4.1** REVIEW encuentra un defecto **plantado a propósito** en el trabajo de BUILD.
-- [~] **G4.2** REVIEW no puede modificar código; solo dictamina.
-      `write` contenido por permiso; **`edit` y `bash` SIN PROBAR** — el banco no
-      llegó a correrlos y lo declaró así en vez de darlos por buenos.
+- [x] **G4.2** REVIEW no puede modificar código; solo dictamina.
+      Las tres herramientas de escritura contenidas **por permiso**, cada una con
+      control positivo que discrimina: `write`, y `edit` y `bash` el 25-ago, en
+      cuanto dejó de haber techo de cuota.
 - [x] **G4.3** El dictamen cita archivo y línea que existen de verdad.
 - [x] **G4.4** Un rechazo de REVIEW devuelve el trabajo a BUILD y la segunda vuelta se completa.
-- [ ] **G4.5** Una tarea real recorre el ciclo entero y termina en verde con evidencia.
+- [x] **G4.5** Una tarea real recorre el ciclo entero y termina en verde con evidencia.
+      Contra **yunque**, repositorio ajeno: BUILD implementó el detector pedido
+      (2 archivos, 91 líneas, en alcance) y el verificador midió por su cuenta
+      **49 pruebas en verde donde había 45**, APROBADO en los cinco controles.
+      Corrida `runs/2026-08-25T20-35-51`.
 
 **Auditoría.** `docs/audits/fase-4.md`
 
