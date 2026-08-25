@@ -19,6 +19,19 @@
       "evidencia": "fases 1 a 4: todas las corridas de agente del proyecto salieron por aquí"
     },
 
+    "opencode-zen": {
+      "credencial": null,
+      "$donde_vive_la_credencial": "En el almacén propio de opencode (`~/.local/share/opencode/auth.json`), puesta con `opencode auth login`. NO es una variable de entorno, así que el relevo no puede comprobarla ni sondear la cuota por HTTP: de este proveedor solo se sabe que el runtime lo tiene configurado. Eso es una duda de verdad, y la duda se intenta.",
+      "endpoint": null,
+      "prefijo_runtime": "opencode/",
+      "cuota": {
+        "tipo": "desconocida",
+        "$nota": "No medida. La pasarela no expone un endpoint que se pueda sondear con la credencial que el relevo ve, y aquí no se escribe un número que no se ha comprobado."
+      },
+      "estado": "DECLARADO",
+      "evidencia": "El 2026-08-25 `opencode run --model opencode/nemotron-3-ultra-free` contestó. Su catálogo lista 29 modelos con coste 0, herramientas y contexto de 200k a 1M. Que conteste no es que un agente haya trabajado contra él."
+    },
+
     "google": {
       "credencial": "GEMINI_API_KEY",
       "credencial_runtime": "GOOGLE_GENERATIVE_AI_API_KEY",
@@ -50,6 +63,15 @@
 
     "nemotron-3-ultra": [
       {
+        "proveedor": "opencode-zen",
+        "id": "nemotron-3-ultra-free",
+        "contexto": 1000000,
+        "tool_calling": true,
+        "estado": "DECLARADO",
+        "$por_que_va_primero": "Es el mismo modelo que la opción de OpenRouter que va detrás, por una pasarela cuyo tier gratis no se ha agotado. Los otros dos proveedores tienen techo diario medido y los dos lo agotan antes de sostener una corrida: OpenRouter 50/día de cuenta, Google 20/día por modelo. El orden no es una preferencia estética: es el único que permite que el sistema haga una tarea entera sin pagar, que es el encargo.",
+        "$ojo": "Cambiar de opción cambia el modelo y dos dictámenes de modelos distintos no son comparables. Por eso la firma del relevo viaja pegada al resultado."
+      },
+      {
         "proveedor": "openrouter",
         "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
         "contexto": 1000000,
@@ -76,6 +98,13 @@
     ],
 
     "nemotron-3-super": [
+      {
+        "proveedor": "opencode-zen",
+        "id": "nemotron-3-super-free",
+        "contexto": 204800,
+        "tool_calling": true,
+        "estado": "DECLARADO"
+      },
       {
         "proveedor": "openrouter",
         "id": "nvidia/nemotron-3-super-120b-a12b:free",

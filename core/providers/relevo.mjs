@@ -154,6 +154,21 @@ export async function elegir({ catalogo, idNeutral, requisitos = {}, env = proce
     // preguntarlo otra vez es gastar una petición para saber lo mismo. Lo que
     // NO se puede heredar entre modelos es el rechazo: "este modelo no existe"
     // habla de un modelo, no del proveedor.
+    if (!proveedor.credencial) {
+      // Su llave no vive en el entorno, así que no hay con qué sondear la cuota
+      // por HTTP. Eso es una duda REAL, y se dice con su motivo: hacerla pasar
+      // por "no hay credencial en el entorno" —que es lo que devolvía la sonda
+      // vacía— describiría como una falta lo que es una forma distinta de
+      // guardar la llave.
+      bitacora.push({
+        proveedor: opcion.proveedor,
+        modelo: opcion.id,
+        resultado: "elegida",
+        motivo: "cuota no sondeable: la credencial no vive en el entorno, la tiene el runtime",
+      })
+      return { elegida: opcion, bitacora, motivo: "" }
+    }
+
     const clave = `${opcion.proveedor}/${opcion.id}`
     const agotadoYa = [...sondeos.entries()].find(
       ([k, v]) => k.startsWith(`${opcion.proveedor}/`) && v.estado === "AGOTADA",

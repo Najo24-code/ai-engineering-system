@@ -198,6 +198,31 @@ test("el rechazo de un modelo no condena al siguiente del mismo proveedor", asyn
   assert.equal(firma(r.elegida), "alfa/a-2")
 })
 
+test("a un proveedor cuya llave tiene el runtime no se le sondea la cuota", async () => {
+  // opencode-zen guarda su credencial en el almacén de opencode, no en el
+  // entorno. Sondearlo por HTTP con la llave que el relevo ve —que no existe—
+  // devolvía "no hay credencial en el entorno": describía como una falta lo que
+  // es otra forma de guardar la llave.
+  const conLocal = {
+    ...catalogo,
+    modelos: { suyo: [{ proveedor: "local", id: "l-grande", contexto: 1000000, tool_calling: true }] },
+  }
+  let sondeos = 0
+  const r = await elegir({
+    catalogo: conLocal,
+    idNeutral: "suyo",
+    requisitos: REVIEW,
+    env,
+    sondear: async () => {
+      sondeos++
+      return hay
+    },
+  })
+  assert.equal(sondeos, 0)
+  assert.equal(firma(r.elegida), "local/l-grande")
+  assert.match(r.bitacora.at(-1).motivo, /no sondeable/)
+})
+
 test("la duda no cierra la puerta: se intenta y que lo diga la corrida", async () => {
   const r = await elegir({
     catalogo,
