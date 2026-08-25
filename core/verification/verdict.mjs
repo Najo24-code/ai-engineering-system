@@ -52,6 +52,7 @@ import { fileURLToPath } from "node:url"
 import { coincideGlob, normalizarRuta } from "../policies/policy.mjs"
 import { perfil } from "../sandbox/profile.mjs"
 import { argv } from "../sandbox/bwrap.mjs"
+import { leerResultado, FORMATOS } from "./resultados.mjs"
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const RAIZ = join(AQUI, "..", "..")
@@ -128,9 +129,17 @@ function controlSuite({ proyecto, afirmado, comando, red }) {
     return hallazgo("suite", false, afirmado, null, `la suite no llegó a correr: ${r.salida.slice(0, 200)}`)
   }
 
-  const medido = leerTap(r.salida)
+  const medido = leerResultado(r.salida)
   if (!medido) {
-    return hallazgo("suite", false, afirmado, null, "no se pudo leer el resultado de la suite; no medible no es aprobado")
+    return hallazgo(
+      "suite",
+      false,
+      afirmado,
+      null,
+      `no se pudo leer el resultado de la suite; no medible no es aprobado. ` +
+        `Formatos que este verificador entiende: ${FORMATOS.join(", ")}. ` +
+        `Si el proyecto usa otro, apúntale al suyo con --comando.`,
+    )
   }
 
   if (medido.fallaron > 0) {

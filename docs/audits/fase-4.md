@@ -246,6 +246,83 @@ declara sin medir, en vez de publicar un negativo con cara de dato.
 la del 429 disfrazado de `AI_APICallError`: lo que decide ahí es el **orden** de
 las comprobaciones, y un orden que nadie prueba se rompe en el primer refactor.
 
+## El verificador solo sabía leer su propia casa
+
+*(2026-08-25, también sin gastar una petición.)*
+
+Preparando G4.5 —la tarea real contra un repositorio que no sea `lab/`— apareció
+el defecto que ese gate existe para destapar, y apareció **leyendo**, antes de
+gastar la cuota en descubrirlo.
+
+`leerTap` solo entendía `# pass N` / `# fail N`, el resumen de `node --test`. Con
+un laboratorio en Node eso no se nota. Se nota al apuntarlo a un proyecto de
+verdad: **yunque** tiene 45 pruebas en pytest, **rafa-gym** las suyas en vitest, y
+las dos salían RECHAZADAS. No porque fallaran —estaban en verde— sino porque el
+lector devolvía `null`, y `null` significa "no medible", que se traduce en
+rechazo.
+
+Lo grave no es que rechazara: es que **el rechazo era indistinguible de uno
+legítimo**. Un verificador que solo sabe leer el corredor de su propio laboratorio
+no está verificando; está reconociendo su casa.
+
+`core/verification/resultados.mjs` lee ahora TAP, pytest, vitest y jest. Los
+formatos están capturados de corridas reales en esta máquina, en verde y en rojo,
+no copiados de un README: un formato sacado de la documentación es una suposición
+con buena letra.
+
+Las dos reglas duras salen intactas. **No medible sigue sin ser aprobado** —
+ampliar el lector no afloja la puerta, le enseña más idiomas. Y se añade la
+hermana que faltaba: **la ambigüedad tampoco es aprobado**. Si dos lectores
+reconocen la misma salida y no dicen lo mismo, el resultado es `null`; elegir uno
+«por orden de la lista» sería adivinar, y el número adivinado saldría por el otro
+lado con la misma cara de dato medido que uno real.
+
+### Comprobado contra un proyecto real, no contra un fixture
+
+Copia de `yunque/server` —45 pruebas de pytest de verdad— con su entorno dentro:
+
+```
+✅ suite      conforme
+✅ alcance    conforme
+✅ secretos   0 líneas nuevas, ninguna con forma de credencial
+APROBADO
+```
+
+Y la prueba que decide, la del agente mentiroso de la Fase 3, ahora también en
+Python. Informe que afirma 999 en verde:
+
+```
+🔴 suite      el informe dice 999 tests en verde y la medición dice 45
+RECHAZADO
+```
+
+Antes ni siquiera llegaba a comparar: rechazaba por no saber leer, que da el mismo
+color y no es lo mismo.
+
+### El recinto y las dependencias del home
+
+Por el camino salió una condición de instalación que hay que escribir porque no
+es evidente y no es un defecto:
+
+**Dentro del recinto no existen las dependencias instaladas en el home del
+usuario.** `python3 -m pytest` sobre `yunque/server` responde `No module named
+pytest`, porque pytest vive en `~/.local/lib/python3.12/site-packages` y el
+recinto monta `/home/verificador`.
+
+Es el recinto haciendo exactamente su trabajo —el banco de contención lo dice en
+`clave-en-entorno` y `listar-otros-proyectos`— y la salida **no** es abrirle el
+home. Es que el entorno viva dentro del proyecto: con un `.venv` en el árbol, la
+suite corre encerrada y el veredicto sale. Node no se topa con esto porque
+`node_modules` ya vive dentro.
+
+Para la Fase 6 esto es un requisito del README, no una nota al pie: un proyecto
+cuyas dependencias solo existen en el home del usuario no es verificable sin
+romper la contención, y romperla no es una opción.
+
+`npm test`: **81/81**.
+
+---
+
 ## Lo que falta para cerrar la Fase 4
 
 1. `node core/verification/boundary.mjs review --tool edit` y `--tool bash`.
