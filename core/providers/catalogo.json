@@ -21,6 +21,8 @@
 
     "google": {
       "credencial": "GEMINI_API_KEY",
+      "credencial_runtime": "GOOGLE_GENERATIVE_AI_API_KEY",
+      "$por_que_dos_nombres": "El endpoint HTTP y el runtime no llaman igual a la misma llave. La sonda de cuota habla por HTTP y lee `GEMINI_API_KEY`, que es como la nombra Google AI Studio; opencode usa el SDK de Google, que exige `GOOGLE_GENERATIVE_AI_API_KEY`. Con solo el primer nombre, el relevo decía «hay credencial ✅» y el runtime contestaba «missing API key» en la corrida siguiente: un verde falso justo en la costura entre las dos piezas, que es donde nadie mira. Verificado el 2026-08-25 con una corrida real que murió así.",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       "prefijo_runtime": "google/",
       "cuota": {

@@ -14,7 +14,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { sondearCuota, leerCabeceras, alcanza, costoMedido, CUOTA } from "./cuota.mjs"
-import { clasificarFallo, FALLO } from "./runner.mjs"
+import { clasificarFallo, credencialesDeRuntime, FALLO } from "./runner.mjs"
 
 /** El cuerpo exacto de un 429 de OpenRouter, capturado el 2026-08-25. */
 const CUERPO_429 = {
@@ -274,6 +274,69 @@ test("una salida vacía es TRANSITORIO", () => {
 
 test("una corrida limpia no es fallo", () => {
   assert.equal(clasificarFallo("RECON REPORT\nEvidence Ledger: ..."), null)
+})
+
+/** La salida literal de la corrida que murió el 2026-08-25 contra yunque. */
+const SIN_CREDENCIAL =
+  "\n> probe · gemini-3.5-flash\n\n" +
+  "Error: Google Generative AI API key is missing. Pass it using the 'apiKey' " +
+  "parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable."
+
+test("una credencial AUSENTE no es una credencial rechazada, y las dos son terminales", () => {
+  // Solo estaba contemplada la rechazada ("invalid api key", 401). El runtime
+  // dice que falta con otras palabras y sin código, así que esto no encajaba en
+  // ningún patrón, caía al `return null` del final —que significa "no falló"— y
+  // el flujo imprimió "listo" para RECON y para BUILD con cero líneas escritas.
+  const f = clasificarFallo(SIN_CREDENCIAL)
+  assert.notEqual(f, null)
+  assert.equal(f.clase, FALLO.TERMINAL)
+  assert.match(f.motivo, /credencial/)
+})
+
+test("un Error que nadie supo clasificar tampoco es una corrida buena", () => {
+  // El límite de lo anterior, escrito. La lista de patrones nunca va a estar
+  // completa, así que lo que importa no es reconocer este error concreto: es que
+  // el valor por defecto haya dejado de ser "todo bien". Un renglón que empieza
+  // por "Error:" no es ambiguo, aunque no se sepa de qué error se trata.
+  const f = clasificarFallo("\n> probe · x\n\nError: algo que todavía no le ha pasado a nadie")
+  assert.notEqual(f, null)
+  assert.match(f.motivo, /sin clasificar/)
+})
+
+// ── la costura entre la sonda y el runtime ──────────────────────────────────
+
+const CAT_DOS_NOMBRES = {
+  proveedores: {
+    google: { credencial: "GEMINI_API_KEY", credencial_runtime: "GOOGLE_GENERATIVE_AI_API_KEY" },
+    openrouter: { credencial: "OPENROUTER_API_KEY" },
+  },
+}
+
+test("la llave se copia al nombre que pide el runtime", () => {
+  // El relevo comprueba GEMINI_API_KEY y dice "hay credencial ✅"; el SDK de
+  // Google exige otro nombre y contesta "missing API key". Las dos piezas tienen
+  // razón por separado y el sistema mentía en el hueco que dejaban.
+  const extra = credencialesDeRuntime({ GEMINI_API_KEY: "k" }, CAT_DOS_NOMBRES)
+  assert.equal(extra.GOOGLE_GENERATIVE_AI_API_KEY, "k")
+})
+
+test("si el nombre del runtime ya viene puesto a mano, manda ese", () => {
+  // Quien lo exportó sabe algo que el catálogo no; pisarlo sería el sistema
+  // decidiendo por encima de la persona sin decírselo.
+  const extra = credencialesDeRuntime(
+    { GEMINI_API_KEY: "del-catalogo", GOOGLE_GENERATIVE_AI_API_KEY: "a-mano" },
+    CAT_DOS_NOMBRES,
+  )
+  assert.equal(extra.GOOGLE_GENERATIVE_AI_API_KEY, undefined)
+})
+
+test("un proveedor con un solo nombre no inventa variables de entorno", () => {
+  const extra = credencialesDeRuntime({ OPENROUTER_API_KEY: "k" }, CAT_DOS_NOMBRES)
+  assert.deepEqual(extra, {})
+})
+
+test("sin la credencial de origen no se copia nada", () => {
+  assert.deepEqual(credencialesDeRuntime({}, CAT_DOS_NOMBRES), {})
 })
 
 // ── el techo de espera ──────────────────────────────────────────────────────

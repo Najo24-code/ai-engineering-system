@@ -20,8 +20,12 @@
  * comilla mal escapada convertiría la prueba en otra cosa sin avisar.
  */
 import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+import { join, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const OPENCODE = `${process.env.HOME}/.opencode/bin/opencode`
+const CATALOGO = join(dirname(fileURLToPath(import.meta.url)), "..", "providers", "catalogo.json")
 
 const INVOCACION = 'cd "$OC_CWD" && "$OC_BIN" run --agent "$OC_AGENT" "$OC_MSG"'
 
@@ -58,6 +62,13 @@ export function clasificarFallo(salida) {
   if (/invalid api key|unauthorized|\b401\b/i.test(salida)) {
     return { motivo: "el proveedor rechazó la credencial", clase: FALLO.TERMINAL }
   }
+  // Ausente NO es rechazada, y hasta el 2026-08-25 solo estaba contemplada la
+  // segunda. El runtime dice "API key is missing" con otras palabras y sin 401,
+  // así que la corrida entera —RECON y BUILD— murió sin escribir una línea y el
+  // flujo imprimió "listo" en las dos. Esperar no lo arregla: falta configurar.
+  if (/api key is missing|missing api key|no api key|apiKey.*(missing|not (set|provided))/i.test(salida)) {
+    return { motivo: "falta la credencial en el entorno del runtime", clase: FALLO.TERMINAL }
+  }
 
   if (!salida.trim()) return { motivo: "el runtime no devolvió nada", clase: FALLO.TRANSITORIO }
   if (/"name":\s*"(\w*Error)"/.test(salida)) {
@@ -70,7 +81,46 @@ export function clasificarFallo(salida) {
   if (/la corrida se agotó/.test(salida)) {
     return { motivo: "la corrida se agotó", clase: FALLO.TRANSITORIO }
   }
+  // El cajón de sastre. Antes esto devolvía `null` directamente, y `null`
+  // significa "no falló": cualquier error que no estuviera en la lista de
+  // arriba entraba como corrida buena. Es la regla del proyecto —lo que no se
+  // puede medir NO pasa— rota justo aquí, en el sitio donde menos se nota,
+  // porque el flujo sigue adelante y solo deja un diff vacío.
+  //
+  // No se puede invertir el valor por defecto (una corrida buena tampoco tiene
+  // marca propia), pero un renglón que empieza por "Error:" no es ambiguo.
+  const suelto = /^\s*Error:\s*(.+)$/m.exec(salida)
+  if (suelto) {
+    return { motivo: `el runtime devolvió un error sin clasificar: ${suelto[1].trim().slice(0, 120)}`, clase: FALLO.TRANSITORIO }
+  }
   return null
+}
+
+/**
+ * El nombre de la llave no es el mismo a los dos lados de la costura.
+ *
+ * La sonda de cuota habla por HTTP y lee la credencial como la nombra el
+ * proveedor (`GEMINI_API_KEY`). El runtime usa el SDK, que exige otro nombre
+ * (`GOOGLE_GENERATIVE_AI_API_KEY`). Con una sola de las dos puesta, el relevo
+ * anuncia "hay credencial ✅" y la corrida siguiente muere por falta de
+ * credencial: las dos piezas tienen razón por separado y el sistema miente en
+ * el hueco que dejan.
+ *
+ * Aquí se copia el valor de una a otra, y el catálogo es quien dice a qué
+ * nombre, porque es el único sitio que ya sabe que los proveedores existen.
+ */
+export function credencialesDeRuntime(entorno = process.env, catalogo = null) {
+  const cat = catalogo ?? JSON.parse(readFileSync(CATALOGO, "utf8"))
+  const extra = {}
+  for (const p of Object.values(cat.proveedores ?? {})) {
+    const { credencial, credencial_runtime: destino } = p
+    if (!credencial || !destino || destino === credencial) continue
+    // Si el nombre del runtime ya viene puesto a mano, manda ese: quien lo
+    // exportó sabe algo que el catálogo no.
+    if (entorno[destino]) continue
+    if (entorno[credencial]) extra[destino] = entorno[credencial]
+  }
+  return extra
 }
 
 /** La forma vieja, para quien solo necesita saber si falló y por qué. */
@@ -97,7 +147,14 @@ export function correrAgente({ agente, mensaje, cwd, intentos = 3, timeoutMs = 8
         encoding: "utf8",
         timeout: timeoutMs,
         maxBuffer: 20 * 1024 * 1024,
-        env: { ...process.env, OC_CWD: cwd, OC_BIN: OPENCODE, OC_AGENT: agente, OC_MSG: mensaje },
+        env: {
+          ...process.env,
+          ...credencialesDeRuntime(),
+          OC_CWD: cwd,
+          OC_BIN: OPENCODE,
+          OC_AGENT: agente,
+          OC_MSG: mensaje,
+        },
       })
     } catch (err) {
       salida = `${err.stdout ?? ""}${err.stderr ?? ""}`
