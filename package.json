@@ -12,6 +12,8 @@
     "gate:boundary": "node core/verification/boundary.mjs",
     "$comment": "Los 'gate:' que llaman al modelo (wiring, boundary) cuestan corridas reales y por eso no son parte de 'test'. 'gate:contencion' NO llama a ningun modelo: es determinista y cuesta cero, asi que se puede correr en cada cambio.",
     "gate:contencion": "node core/sandbox/containment.mjs",
-    "verdict": "node core/verification/verdict.mjs"
+    "verdict": "node core/verification/verdict.mjs",
+    "flow:review": "node core/flow/review.mjs",
+    "flow:rework": "node core/flow/rework.mjs"
   }
 }

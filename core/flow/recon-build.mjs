@@ -64,6 +64,12 @@ const guardar = (nombre, contenido) => {
 const gitDiff = () =>
   execFileSync("git", ["-C", ROOT, "diff", "--", target], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 })
 
+// La corrida tiene que poder leerse sola. Sin la tarea guardada, la etapa de
+// REVIEW no sabe contra qué juzgar el diff, y "lo que se pidió" acaba siendo lo
+// que alguien recuerde haber pedido.
+guardar("tarea.txt", `${task}\n`)
+guardar("objetivo.txt", `${target}\n`)
+
 console.log(`Corrida: runs/${sello}`)
 console.log(`Objetivo: ${target}`)
 console.log(`Tarea: ${task}\n`)

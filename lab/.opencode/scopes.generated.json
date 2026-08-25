@@ -24,6 +24,10 @@
     "recon": {
       "write": [],
       "shell": []
+    },
+    "review": {
+      "write": [],
+      "shell": []
     }
   }
 }
