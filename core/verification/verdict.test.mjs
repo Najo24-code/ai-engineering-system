@@ -225,7 +225,9 @@ test("citas: una línea que no existe es una alucinación con forma de dato", ()
   const dir = arbol()
   try {
     assert.equal(citasRotas(dir, "ver src/app.js:1").length, 0)
-    assert.equal(citasRotas(dir, "ver src/app.js:214")[0].motivo, "el archivo tiene 2 líneas")
+    assert.equal(citasRotas(dir, "ver src/app.js:214")[0].motivo, "el archivo tiene 1 líneas")
+    // El archivo termina en salto de línea: su última línea real es la 1, no la 2.
+    assert.equal(citasRotas(dir, "ver src/app.js:2").length, 1)
     assert.equal(citasRotas(dir, "ver src/pagos.js:10")[0].motivo, "el archivo no existe")
     // Una cita que apunta fuera del proyecto tampoco vale: `normalizarRuta` la
     // devuelve nula y el verificador no sale del árbol a comprobarla.

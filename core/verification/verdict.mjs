@@ -256,7 +256,12 @@ export function citasRotas(proyecto, texto) {
       rotas.push({ cita, motivo: "el archivo no existe" })
       continue
     }
-    const lineas = readFileSync(abs, "utf8").split("\n").length
+    // Un archivo que termina en salto de línea NO tiene una línea vacía de más:
+    // `"a\nb\nc\n".split("\n")` devuelve cuatro trozos y el último no es una
+    // línea, es el final. Contarlo dejaba pasar una cita a la línea N+1, y esto
+    // es justamente el control que caza citas inventadas.
+    const texto = readFileSync(abs, "utf8")
+    const lineas = texto.replace(/\n$/, "").split("\n").length
     if (linea > lineas) rotas.push({ cita, motivo: `el archivo tiene ${lineas} líneas` })
   }
   return rotas

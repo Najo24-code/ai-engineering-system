@@ -32,7 +32,8 @@ import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
-import { veredicto, citasRotas } from "../verification/verdict.mjs"
+import { veredicto } from "../verification/verdict.mjs"
+import { leerDictamen, citasRotasEnAmbasRaices } from "./dictamen.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -134,32 +135,11 @@ console.log("listo")
 
 // ── 3. las citas del dictamen se auditan una por una ────────────────────────
 
-/**
- * El dictamen puede citar `src/x.js:10` o `lab/src/x.js:10` según desde dónde
- * mire. Una cita solo se declara rota si falla contra los DOS puntos de partida:
- * lo que se audita es si el archivo y la línea existen, no si el revisor eligió
- * la convención de rutas que a este script le venía bien.
- */
-const rotas = citasRotas(CWD, dictamen).filter((c) => citasRotas(ROOT, c.cita).length > 0)
+const rotas = citasRotasEnAmbasRaices(CWD, ROOT, dictamen)
 
 // ── 4. coherencia del propio dictamen ───────────────────────────────────────
 
-const campo = (nombre) => {
-  const m = new RegExp(`^\\s*(?:\\*\\*)?${nombre}(?:\\*\\*)?:\\s*(?:\\*\\*)?\\s*([A-Za-z0-9]+)`, "mi").exec(dictamen)
-  return m ? m[1].toUpperCase() : null
-}
-
-const veredictoRevisor = campo("Verdict")
-const bloqueantes = Number(campo("Blocking defects") ?? NaN)
-
-const incoherencias = []
-if (!veredictoRevisor) incoherencias.push("el dictamen no termina con un 'Verdict:' legible")
-else if (!["APPROVED", "REJECTED"].includes(veredictoRevisor)) incoherencias.push(`veredicto desconocido: ${veredictoRevisor}`)
-if (Number.isNaN(bloqueantes)) incoherencias.push("no dice cuántos defectos bloqueantes encontró")
-else if (veredictoRevisor === "REJECTED" && bloqueantes === 0)
-  incoherencias.push("rechaza sin un solo defecto bloqueante: un dictamen así enseña a no leerlo")
-else if (veredictoRevisor === "APPROVED" && bloqueantes > 0)
-  incoherencias.push(`aprueba con ${bloqueantes} defectos bloqueantes`)
+const { veredicto: veredictoRevisor, bloqueantes, incoherencias } = leerDictamen(dictamen)
 
 // ── el resultado de la etapa ────────────────────────────────────────────────
 
