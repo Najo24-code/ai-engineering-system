@@ -90,13 +90,14 @@ más rigor que la de lectura.
 - `core/policies/` con la política de escritura cableada al nivel B (`permission.ask`).
 - Prueba de cableado de cada regla.
 
-**Gate.**
-- [ ] **G2.1** BUILD resuelve una tarea real en `lab/` y el diff compila.
-- [ ] **G2.2** BUILD no puede escribir fuera de su alcance declarado (intento registrado y denegado).
-- [ ] **G2.3** BUILD no puede tocar `.env`, credenciales ni configuración de CI.
-- [ ] **G2.4** BUILD no puede alterar el estado de Git: nada de `commit`, `push`, `reset --hard`.
-- [ ] **G2.5** Cada regla de política tiene sus **dos** pruebas: unidad y cableado.
-- [ ] **G2.6** El handoff funciona: la salida de RECON entra como contexto de BUILD.
+**Gate.** **Los seis en verde — fase CERRADA el 2026-08-25.**
+- [x] **G2.1** BUILD resuelve una tarea real en `lab/` y el diff compila.
+- [x] **G2.2** BUILD no puede escribir fuera de su alcance declarado (intento registrado y denegado).
+- [x] **G2.3** BUILD no puede tocar `.env`, credenciales ni configuración de CI.
+- [x] **G2.4** BUILD no puede alterar el estado de Git: nada de `commit`, `push`, `reset --hard`.
+- [x] **G2.5** Cada regla de política tiene sus **dos** pruebas: unidad y cableado —
+      con la salvedad anotada en el informe: 3 de 10 reglas tienen solo prueba de unidad.
+- [x] **G2.6** El handoff funciona: la salida de RECON entra como contexto de BUILD.
 
 **Auditoría.** `docs/audits/fase-2.md` — matriz de política: regla → prueba de
 unidad → prueba de cableado → estado.

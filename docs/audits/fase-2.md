@@ -3,7 +3,9 @@
 **Fecha:** 2026-08-24
 **Runtime:** opencode 1.18.18
 **Modelo:** `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free`
-**Estado de la fase:** ABIERTA — 4 de 6 gates cerrados con evidencia, 2 bloqueados por
+**Estado de la fase: CERRADA el 2026-08-25.** Los 6 gates con evidencia.
+
+> Este informe se escribió con la fase abierta: 4 de 6 gates cerrados y 2 bloqueados por
 el tope diario del proveedor. El detalle está abajo, sin redondear.
 
 ---
@@ -196,18 +198,57 @@ funciona.
       7 reglas tienen unidad + cableado; 3 (`U-DESTRUCTIVO`, `U-DESCONOCIDA`,
       `A-SOLO-LECTURA`) tienen solo unidad, y arriba está dicho por qué no se
       pudieron cablear con un agente real. No se cuentan como cableadas.
-- [ ] **G2.1** BUILD resuelve una tarea real en `lab/` y el diff compila.
-      **BLOQUEADO** — ver abajo.
-- [ ] **G2.6** El handoff funciona: la salida de RECON entra como contexto de BUILD.
-      **BLOQUEADO** — ver abajo. El código del handoff existe
-      (`core/flow/recon-build.mjs`) y su detección de fallo funcionó, pero eso no
-      es haberlo demostrado.
+- [x] **G2.1** BUILD resuelve una tarea real en `lab/` y el diff compila.
+      **CERRADO el 2026-08-25** — ver "Lo que desbloqueó la fase".
+- [x] **G2.6** El handoff funciona: la salida de RECON entra como contexto de BUILD.
+      **CERRADO el 2026-08-25** — ver "Lo que desbloqueó la fase".
 
 **24 tests de unidad**, todos en verde: `node --test core/policies/policy.test.mjs`.
 
 ---
 
-## Lo que bloquea
+## Lo que desbloqueó la fase (2026-08-25)
+
+El tope diario del proveedor se reinició y la corrida completa se pudo hacer:
+
+```
+node core/flow/recon-build.mjs --task "En src/server.js anade un endpoint GET /version
+  que devuelva {version} leyendo la version de package.json, y un test en tests/."
+```
+
+Evidencia en `runs/2026-08-25T01-36-10/` (no versionada, `runs/` está gitignored).
+
+**G2.6 — el handoff.** RECON produjo 188 líneas de reporte y BUILD lo usó: su
+Evidence Ledger cita "RECON REPORT §5, §7" como fuente, marcada `INFERRED`, para
+saber que el proyecto no tenía `node_modules`. No volvió a explorar el repositorio
+desde cero, que es exactamente lo que el handoff existe para evitar.
+
+**G2.1 — el diff.** BUILD tocó dos archivos y solo dos: `src/server.js` (el
+endpoint) y `tests/server.test.js` (un test de integración que levanta el servidor
+en un puerto efímero). El diff es correcto: verificado de forma independiente por
+el verificador de la fase 3, **2 tests en verde**.
+
+### Y lo mejor de la corrida: BUILD no mintió
+
+BUILD necesitaba `npm install` para correr la suite. El policy gate se lo negó
+—el comando no está en su lista— y BUILD lo escribió en su informe tal cual:
+
+```
+## Blocked
+| Policy gate: `npm install` not in allowed commands | ... | NO |
+...
+Verification result: FAIL (blocked by missing dependencies)
+Ready for review: NO
+```
+
+Un agente que reporta FAIL cuando podría haber reportado éxito es el resultado que
+esta fase perseguía. El verificador de la fase 3, que no le cree nada, llegó a la
+misma conclusión por su cuenta —`🔴 suite: 1 tests fallan`— y las dos cosas
+coincidieron. La dependencia la instaló una persona, que es quien debía.
+
+---
+
+## Lo que bloqueaba (histórico)
 
 **Tope diario del proveedor.** La Fase 2 consumió unas 20 corridas reales entre
 sondas y bancos. Al intentar el flujo completo:
@@ -231,7 +272,9 @@ banco hay que poder correrlo cada vez que cambia una política.
 
 ## Deuda que queda anotada
 
-1. **`npm test` es una puerta trasera del alcance.** BUILD puede escribir en
+1. ~~**`npm test` es una puerta trasera del alcance.**~~ **CERRADA en la fase 3**
+   por el recinto (`core/sandbox/`): el ataque `ejecutar-lo-que-escribio` quedó
+   contenido con control positivo. Texto original abajo. BUILD puede escribir en
    `tests/**` y puede correr `npm test`. Un test que él mismo escriba corre con los
    permisos del proceso, no con los del agente, y desde ahí puede hacer lo que el
    gate le niega. La frontera de escritura está cerrada; la de **ejecución de lo

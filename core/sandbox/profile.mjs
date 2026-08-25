@@ -43,10 +43,30 @@ const SISTEMA = ["/usr", "/etc/ssl", "/etc/ca-certificates", "/etc/alternatives"
 const ENLACES = { "/bin": "usr/bin", "/lib": "usr/lib", "/lib64": "usr/lib64", "/sbin": "usr/sbin" }
 
 /**
- * Lo que el proceso necesita para RESOLVER nombres. Solo tiene sentido si hay
- * red; si no la hay, montarlo sería decorar.
+ * Resolver `localhost` NO es "tener red", y confundir las dos cosas costó un
+ * falso rojo entero.
+ *
+ * El recinto sin red conserva su interfaz de loopback: un proceso de dentro
+ * puede levantar un servidor en 127.0.0.1 y hablar consigo mismo, que es como
+ * funciona la mitad de las suites de integración que existen. Lo que NO puede
+ * hacer sin estos dos archivos es traducir el nombre "localhost" a esa
+ * dirección: `getaddrinfo` devuelve EAI_AGAIN y el test falla.
+ *
+ * Se descubrió verificando una corrida real de BUILD. El endpoint estaba bien,
+ * el test estaba bien, y el veredicto salía RECHAZADO por el nombre de una
+ * máquina. Un verificador que rechaza trabajo correcto se desactiva en una
+ * semana, y entonces ya no protege nada.
+ *
+ * Van siempre, haya red o no. No abren nada: son dos tablas de nombres de solo
+ * lectura, y sin `--share-net` no hay a dónde ir.
  */
-const RED = ["/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf"]
+const NOMBRES_LOCALES = ["/etc/hosts", "/etc/nsswitch.conf"]
+
+/**
+ * Lo que hace falta para resolver nombres de FUERA. Esto sí es red, y solo se
+ * monta cuando se ha concedido explícitamente.
+ */
+const RED = ["/etc/resolv.conf"]
 
 /**
  * Variables que se dejan pasar. La lista es blanca a propósito.
@@ -74,7 +94,7 @@ export function perfil({ proyecto, home, herramientas = [], efimeras = [], red =
   if (!proyecto?.startsWith("/")) throw new Error("el proyecto tiene que ser una ruta absoluta")
   if (!home?.startsWith("/")) throw new Error("el home tiene que ser una ruta absoluta")
 
-  const lectura = [...SISTEMA, ...(red ? RED : [])].filter(existsSync)
+  const lectura = [...SISTEMA, ...NOMBRES_LOCALES, ...(red ? RED : [])].filter(existsSync)
 
   for (const h of herramientas) {
     if (!existsSync(h)) throw new Error(`la herramienta "${h}" no existe; el recinto quedaría inservible`)

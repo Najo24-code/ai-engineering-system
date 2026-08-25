@@ -122,7 +122,7 @@ Tres reglas gobiernan el archivo, y las tres son incómodas a propósito:
 | **G3.4** Prueba del agente mentiroso | ✅ | Tests `G3.4` y `G3.4b`, más una corrida real contra este repositorio (abajo) |
 | **G3.5** El veredicto se guarda con su evidencia y es reproducible | ✅ | `evidence/fase-3-veredictos.jsonl`; comandos reproducibles abajo |
 
-**35 tests de unidad en verde** (`npm test`), sin una sola llamada al proveedor.
+**36 tests de unidad en verde** (`npm test`), sin una sola llamada al proveedor.
 
 ### G3.4, cableado contra este mismo repositorio
 
@@ -167,6 +167,54 @@ ninguna línea del código fuente contiene una cadena con forma de clave.
 
 ---
 
+## Lo que enseñó ponerlo a juzgar una corrida real
+
+Escrito el verificador, se le dio a juzgar la corrida de BUILD que cerró la fase 2
+(`runs/2026-08-25T01-36-10`). Encontró dos defectos, **los dos míos, no del
+agente**, y los dos de la clase que más daño hace: falsos rojos.
+
+### 1. El proyecto no siempre es la raíz del repositorio
+
+`git diff --name-only` devuelve rutas desde la raíz del repositorio. `lab/` es un
+subdirectorio, así que cada ruta llegaba con un prefijo de más y `normalizarRuta`
+la mandaba fuera del alcance. El veredicto salía RECHAZADO **con un motivo que
+además sonaba plausible** —"tocó archivos fuera de su alcance"— cuando el agente
+no había hecho nada malo. Arreglado con `--relative`, y con su prueba (`G3.2c`).
+
+### 2. Resolver `localhost` no es "tener red"
+
+Con `red: false` el recinto conserva su loopback: un proceso de dentro puede
+levantar un servidor en `127.0.0.1` y hablarse a sí mismo — verificado. Lo que no
+podía era traducir el **nombre** `localhost` a esa dirección, porque
+`/etc/hosts` y `/etc/nsswitch.conf` se montaban solo con red. `getaddrinfo`
+devolvía `EAI_AGAIN` y el test de integración de BUILD fallaba.
+
+El endpoint estaba bien. El test estaba bien. El veredicto salía RECHAZADO por el
+nombre de una máquina.
+
+Esto no es una molestia: es el modo de fallo que mata verificadores. La mitad de
+las suites de integración que existen hablan por loopback usando el nombre. Un
+verificador que rechaza trabajo correcto se desactiva en una semana, y entonces ya
+no protege nada. Los dos archivos ahora se montan **siempre**, de solo lectura;
+no abren nada, porque sin `--share-net` no hay a dónde ir. El banco de contención
+se volvió a correr entero después del cambio: **sigue en 0 fugas**. Una frontera
+no se hereda de la corrida anterior.
+
+### Y una coincidencia que vale la pena
+
+BUILD reportó honestamente `Verification result: FAIL`, porque el policy gate le
+negó `npm install` y sin dependencias la suite no corría. El verificador, que no
+le cree nada, llegó por su cuenta a `🔴 suite: 1 tests fallan`. Instalada la
+dependencia por una persona —que es quien debía— el mismo diff pasó a
+**APROBADO con 2 tests en verde**.
+
+Es la primera vez que las dos capas se pronuncian sobre el mismo trabajo y dicen
+lo mismo por caminos independientes. Que coincidan no prueba que el verificador
+funcione; que discrepen es lo que habría que mirar. Pero es la forma que tiene que
+tener un día normal.
+
+---
+
 ## Deuda que queda anotada
 
 1. **El verificador no está cableado al flujo.** `core/flow/recon-build.mjs` no lo
@@ -189,7 +237,14 @@ ninguna línea del código fuente contiene una cadena con forma de clave.
    El recinto lo tapa —`salir-por-symlink` quedó contenido— pero taparlo abajo no
    es arreglarlo arriba: con otro runtime sin recinto, el agujero vuelve.
 6. **`realtime-auditor.ts` sigue roto** (H-20), desde el 22-ago.
-7. **La corrida del banco depende del entorno donde se lanza.** Ver el falso
+7. **El verificador juzga el ÁRBOL, no al autor.** Al instalar las dependencias
+   apareció `package-lock.json` y el control de alcance lo marcó fuera — con
+   razón, pero el archivo lo había puesto una persona, no el agente. El
+   verificador no tiene forma de atribuir un cambio a quién lo hizo. Mientras el
+   ciclo lo dispare una persona no es grave; en cuanto haya orquestador, el
+   veredicto tendrá que tomarse contra un punto de partida capturado **antes** de
+   soltar al agente, no contra `HEAD`.
+8. **La corrida del banco depende del entorno donde se lanza.** Ver el falso
    negativo de `red-saliente`. Conviene que el banco acabe registrando por sí
    mismo si tuvo red, en vez de dejarlo a la lectura del informe.
 

@@ -162,6 +162,23 @@ test("G3.2: un archivo fuera del alcance tumba el veredicto", () => {
   }
 })
 
+test("G3.2c: el proyecto puede ser un SUBDIRECTORIO del repositorio", () => {
+  // El caso de `lab/`. Sin `--relative` las rutas llegan con el prefijo del
+  // repositorio y todo cae "fuera del alcance" por fontanería, no por mérito.
+  const repo = arbol()
+  const sub = join(repo, "paquetes", "web")
+  mkdirSync(join(sub, "src"), { recursive: true })
+  mkdirSync(join(sub, "tests"), { recursive: true })
+  writeFileSync(join(sub, "package.json"), '{"name":"web","private":true}\n')
+  writeFileSync(join(sub, "tests", "ok.test.js"), TEST_QUE_PASA)
+  try {
+    const v = veredicto({ proyecto: sub, alcance: ALCANCE, informe: { tests: { pasaron: 1, fallaron: 0 } } })
+    assert.equal(v.resultado, "APROBADO", v.motivos.join(" | "))
+  } finally {
+    limpiar(repo)
+  }
+})
+
 test("G3.2b: sin alcance declarado no hay nada contra qué medir", () => {
   const dir = arbol({ tests: { "ok.test.js": TEST_QUE_PASA } })
   try {

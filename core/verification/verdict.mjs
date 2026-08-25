@@ -161,8 +161,16 @@ function controlSuite({ proyecto, afirmado, comando, red }) {
 
 // ── G3.2 · el diff toca solo rutas permitidas ───────────────────────────────
 
+/**
+ * `--relative` no es cosmético. Sin él, `git diff --name-only` devuelve rutas
+ * desde la RAÍZ del repositorio, y el proyecto que se juzga puede ser un
+ * subdirectorio —`lab/` lo es— con lo que cada ruta llega con un prefijo de más
+ * y `normalizarRuta` la manda fuera del alcance. El veredicto saldría rechazado
+ * por un error de fontanería y con un motivo que además suena plausible, que es
+ * la peor clase de falso rojo.
+ */
 export function archivosDelDiff(proyecto, base) {
-  const salida = git(proyecto, ["diff", "--name-only", base])
+  const salida = git(proyecto, ["diff", "--name-only", "--relative", base])
   const sinSeguir = git(proyecto, ["ls-files", "--others", "--exclude-standard"])
   return [...new Set([...salida.split("\n"), ...sinSeguir.split("\n")].map((l) => l.trim()).filter(Boolean))]
 }
@@ -193,7 +201,7 @@ function controlAlcance({ proyecto, base, alcance, afirmado }) {
  * y lo aprobaría en silencio, que es la peor manera de fallar.
  */
 function controlSecretos({ proyecto, base }) {
-  const añadidas = git(proyecto, ["diff", base])
+  const añadidas = git(proyecto, ["diff", "--relative", base])
     .split("\n")
     .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
 
