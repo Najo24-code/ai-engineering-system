@@ -61,10 +61,11 @@
       },
       {
         "proveedor": "google",
-        "id": "gemini-flash-latest",
+        "id": "gemini-2.5-flash",
         "contexto": 1048576,
         "tool_calling": true,
-        "estado": "DECLARADO"
+        "estado": "DECLARADO",
+        "$nota": "Aquí decía `gemini-flash-latest`, que es el alias que el propio listado de Google anuncia. Medido el 2026-08-25 con curl y con fetch: ese alias NO responde — no da 404, se queda colgado sin contestar, y por eso `npm run relevo` se congelaba en el segundo agente. `gemini-2.5-flash` sí contesta (200 en 0,6 s). Sigue en DECLARADO: que el endpoint conteste no es que un agente haya corrido contra él."
       }
     ],
 
@@ -78,10 +79,11 @@
       },
       {
         "proveedor": "google",
-        "id": "gemini-flash-lite-latest",
+        "id": "gemini-2.5-flash",
         "contexto": 1048576,
         "tool_calling": true,
-        "estado": "DECLARADO"
+        "estado": "DECLARADO",
+        "$nota": "Aquí decía `gemini-flash-lite-latest`, otro alias `-latest` de los que cuelgan sin contestar. Debería ir un modelo más ligero que el de `nemotron-3-ultra`, pero el único ligero de Google que está MEDIDO es este mismo, así que se repite en vez de escribir un id sin comprobar: un id que no se sirve no falla, cuelga. Queda por medir `gemini-2.5-flash-lite`."
       }
     ],
 
