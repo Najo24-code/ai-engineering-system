@@ -85,6 +85,7 @@ export function leerCabeceras({ headers, cuerpo } = {}) {
  * @param {string}   opciones.modelo   id tal como lo espera el proveedor
  * @param {Function} [opciones.fetchImpl]
  * @param {string}   [opciones.url]
+ * @param {number}   [opciones.timeoutMs] techo de espera; ver abajo por qué existe
  * @returns {Promise<{estado: string, restantes: number|null, limite: number|null,
  *                    resetMs: number|null, detalle: string}>}
  */
@@ -93,6 +94,16 @@ export async function sondearCuota({
   modelo,
   fetchImpl = globalThis.fetch,
   url = "https://openrouter.ai/api/v1/chat/completions",
+  // Medido el 2026-08-25 contra Google AI Studio: un id de modelo que el
+  // proveedor no sirve por su endpoint compatible **no responde con un error, se
+  // queda colgado**. `gemini-2.5-flash` contesta en 0,6 s; `gemini-flash-latest`
+  // —que el propio listado de modelos anuncia— no contesta nunca, ni por fetch ni
+  // por curl. Sin techo, esa opción del catálogo congela la elección de proveedor
+  // entera y el sistema se queda sin arrancar por un id mal escrito.
+  //
+  // El techo no adivina: convierte "no contesta" en INDETERMINADA, que es lo que
+  // de verdad se sabe, y deja seguir a la siguiente opción.
+  timeoutMs = 20000,
 } = {}) {
   if (!apiKey) {
     return { ...vacio(), detalle: "no hay credencial en el entorno" }
@@ -100,17 +111,29 @@ export async function sondearCuota({
 
   let respuesta
   let cuerpo = null
+  const reloj = new AbortController()
+  const alarma = setTimeout(() => reloj.abort(), timeoutMs)
   try {
     respuesta = await fetchImpl(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: modelo, ...SONDA }),
+      signal: reloj.signal,
     })
     cuerpo = await respuesta.json().catch(() => null)
   } catch (err) {
     // Sin red no se sabe nada. Decirlo es más útil que suponer que hay cuota y
     // dejar que nueve corridas lo descubran una por una.
-    return { ...vacio(), detalle: `la sonda no llegó al proveedor: ${err.message}` }
+    const colgado = err?.name === "AbortError" || reloj.signal.aborted
+    return {
+      ...vacio(),
+      detalle: colgado
+        ? `la sonda esperó ${timeoutMs} ms y el proveedor no contestó (modelo "${modelo}"; ` +
+          `un id que el proveedor no sirve se cuelga en vez de dar error)`
+        : `la sonda no llegó al proveedor: ${err.message}`,
+    }
+  } finally {
+    clearTimeout(alarma)
   }
 
   const { limite, restantes, resetMs } = leerCabeceras({ headers: respuesta.headers, cuerpo })

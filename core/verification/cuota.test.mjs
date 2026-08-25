@@ -197,3 +197,49 @@ test("una salida vacía es TRANSITORIO", () => {
 test("una corrida limpia no es fallo", () => {
   assert.equal(clasificarFallo("RECON REPORT\nEvidence Ledger: ..."), null)
 })
+
+// ── el techo de espera ──────────────────────────────────────────────────────
+
+test("un proveedor que no contesta sale INDETERMINADA, no cuelga la elección", async () => {
+  // Medido el 2026-08-25: `gemini-flash-latest` figura en el listado de modelos
+  // de Google y su endpoint compatible no responde nunca. Sin techo, esa opción
+  // del catálogo congelaba `npm run relevo` entero.
+  const fetchQueNuncaContesta = (_url, opciones) =>
+    new Promise((_, rechaza) => {
+      opciones.signal.addEventListener("abort", () => {
+        const e = new Error("This operation was aborted")
+        e.name = "AbortError"
+        rechaza(e)
+      })
+    })
+
+  const r = await sondearCuota({
+    apiKey: "sk-de-mentira",
+    modelo: "el-que-cuelga",
+    fetchImpl: fetchQueNuncaContesta,
+    timeoutMs: 25,
+  })
+
+  assert.equal(r.estado, CUOTA.INDETERMINADA)
+  assert.match(r.detalle, /no contestó/)
+  assert.match(r.detalle, /el-que-cuelga/)
+})
+
+test("colgarse no se confunde con no tener red: el motivo distingue los dos", async () => {
+  const fetchSinRed = () => Promise.reject(new TypeError("fetch failed"))
+  const r = await sondearCuota({ apiKey: "sk-de-mentira", modelo: "x", fetchImpl: fetchSinRed, timeoutMs: 25 })
+  assert.equal(r.estado, CUOTA.INDETERMINADA)
+  assert.match(r.detalle, /no llegó al proveedor/)
+})
+
+test("el techo no estorba cuando el proveedor sí contesta", async () => {
+  const fetchRapido = async () => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({ "x-ratelimit-limit": "50", "x-ratelimit-remaining": "49" }),
+    json: async () => ({ choices: [] }),
+  })
+  const r = await sondearCuota({ apiKey: "sk-de-mentira", modelo: "x", fetchImpl: fetchRapido, timeoutMs: 25 })
+  assert.equal(r.estado, CUOTA.DISPONIBLE)
+  assert.equal(r.restantes, 49)
+})
