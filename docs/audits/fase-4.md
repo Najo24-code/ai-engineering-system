@@ -321,6 +321,94 @@ romper la contención, y romperla no es una opción.
 
 `npm test`: **81/81**.
 
+## Ningún proveedor imprescindible
+
+*(2026-08-25. El encargo, dicho por quien lo usa: que esto funcione con
+**cualquier IA que se pueda usar gratis**.)*
+
+La consecuencia de diseño no es «que acepte más proveedores». Es que **ninguno
+sea imprescindible**. Mientras las cuatro fases salieron todas por OpenRouter,
+el proyecto no tenía un proveedor preferido: tenía una dependencia, y se notó
+el día que su tope de 50 diarias detuvo dos fases seguidas.
+
+Comprar créditos habría tapado eso sin arreglarlo.
+
+### La regla: el relevo no es un descuento sobre el contrato
+
+Un contrato declara lo que el agente necesita. REVIEW pide `tool_calling` y
+`min_context: 200000`, porque sostiene a la vez el diff, los archivos que el diff
+toca y el reporte de BUILD. **Una opción que no llega a eso no se usa, ni siquiera
+si es la única que queda.**
+
+Sin cuota, el sistema se para y lo dice. Con un modelo que no cabe, el sistema
+sigue andando y empieza a opinar sobre el resumen: un fallo silencioso, y por eso
+peor que el bloqueo.
+
+Eso descarta cosas concretas, y el motivo queda escrito en el catálogo en vez de
+volver a investigarse cada vez:
+
+| Descartado | Por qué (medido contra el catálogo del runtime) |
+|---|---|
+| Groq | 0 modelos con herramientas y ≥200k de contexto |
+| Cerebras | 0 modelos con herramientas y ≥200k |
+| GitHub Copilot | exige suscripción; no es una vía gratuita |
+| Ollama local | los modelos de esta máquina son 4B–8B con ~32k. Única vía gratis **ilimitada**, así que sirve para contratos de contexto corto; hoy ninguno de los tres agentes lo es |
+
+Y deja en pie **Google AI Studio** (16 modelos con herramientas, hasta 1M de
+contexto), que entra al catálogo como `DECLARADO`: existe en el catálogo del
+runtime y **nadie ha corrido un agente contra él**. Un `DECLARADO` se puede
+intentar; lo que no puede es aparecer en una auditoría como capacidad del
+sistema. Es la misma regla que gobierna las fronteras.
+
+Un dato que cambia el diseño: `free-models-per-day` es un tope **de cuenta**, no
+de modelo. Relevar entre modelos gratis del mismo proveedor no recupera ni una
+petición. Por eso la cuota se pregunta **una vez por proveedor** y no una por
+modelo — preguntar tres veces gastaría tres peticiones para enterarse tres veces
+de lo mismo.
+
+### Por qué hay bitácora
+
+Cambiar de proveedor cambia el modelo, y un modelo distinto puede dictaminar
+distinto sobre el mismo diff. Un relevo transparente —que sustituye por debajo sin
+dejar rastro— fabricaría una serie de resultados no comparables **con aspecto de
+serie comparable**. Cada elección deja escrito qué se usó, qué se saltó y por qué.
+
+### Cableado, no declarado
+
+`npm run relevo` lee los contratos, elige, y escribe `eleccion.json`, que el
+adaptador **prefiere** sobre el `model_map` estático: un mapa fijo no puede saber
+que hoy el proveedor de siempre está agotado. Sin ese archivo, sync se comporta
+exactamente como antes.
+
+Corrido en vivo con la cuota real a cero:
+
+```
+─── review · pide "nemotron-3-ultra" (200.000 de contexto) ───
+  ↷ openrouter/nvidia/nemotron-3-ultra-550b-a55b:free: el proveedor no tiene cuota
+  ↷ openrouter/minimax/minimax-m3:free: el proveedor no tiene cuota
+  ↷ google/gemini-flash-latest: no hay credencial — falta GEMINI_API_KEY
+  → SIN PROVEEDOR
+```
+
+Salida 6, y el motivo por opción. Y con una elección apuntando a un proveedor
+`DECLARADO`, sync lo usa **pero lo dice**:
+
+```
+⚠ review: corre con google/gemini-flash-latest, que está DECLARADO, no verificado
+```
+
+12 pruebas nuevas. La que manda es «sin cuota se para; NO baja el listón del
+contrato»: las demás comprueban que el relevo encuentra por dónde seguir, esa
+comprueba que prefiere pararse antes que seguir con un modelo que no cabe.
+
+`npm test`: **93/93**. Contención: **0 fugas**.
+
+### Lo que falta para que esto valga como capacidad
+
+Una credencial gratuita de Google AI Studio y **una corrida real** contra ella. Con
+eso `google` pasa de `DECLARADO` a `VERIFICADO`, el relevo tiene a dónde relevar
+de verdad, y la cuota de OpenRouter deja de ser el techo del proyecto.
+
 ---
 
 ## Lo que falta para cerrar la Fase 4

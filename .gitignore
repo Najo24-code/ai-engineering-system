@@ -34,3 +34,8 @@ runs/
 # politica resuelta a absoluta: pertenece a una maquina concreta, no al
 # repositorio. El canonico vive en runtimes/opencode/plugins/.
 lab/.opencode/plugins/policy-gate.ts
+
+# La eleccion de proveedor caduca: refleja que cuota habia cuando se decidio.
+# Versionarla haria que un arbol limpio prometiera un proveedor que hoy puede
+# estar agotado. Se regenera con: node core/providers/elegir.mjs
+runtimes/opencode/eleccion.json

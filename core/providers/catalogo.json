@@ -1,0 +1,98 @@
+{
+  "$comment": "La escalera de proveedores. Un id neutral de contrato se resuelve recorriendo esta lista en orden hasta encontrar una opción que CUMPLA EL CONTRATO y tenga con qué correr. Es la única pieza, junto al model_map del runtime, que sabe que los proveedores existen.",
+
+  "$regla": "Ninguna entrada de aquí se da por buena porque esté escrita. Cada una lleva su `estado`: VERIFICADO significa que se corrió un agente real contra ella y funcionó; DECLARADO significa que el catálogo del runtime dice que existe y nadie lo ha probado todavía. Un DECLARADO se puede intentar, pero no puede aparecer en un informe de auditoría como capacidad del sistema. Es la misma regla que gobierna las fronteras: probado o no probado, nunca 'debería'.",
+
+  "$por_que_el_orden_importa": "Cambiar de proveedor cambia el modelo, y un modelo distinto puede dictaminar distinto sobre el mismo diff. Por eso el relevo NO es transparente: qué opción se usó queda registrado junto al resultado. Dos dictámenes producidos por modelos distintos no son comparables, y un sistema que lo ocultara estaría fabricando una serie temporal falsa.",
+
+  "proveedores": {
+    "openrouter": {
+      "credencial": "OPENROUTER_API_KEY",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "prefijo_runtime": "openrouter/",
+      "cuota": {
+        "tipo": "diaria_por_cuenta",
+        "$nota": "`free-models-per-day` es un tope DE CUENTA, no de modelo: relevar entre modelos gratis del mismo proveedor no recupera ni una petición. Verificado el 2026-08-25 contra el 429 del propio proveedor.",
+        "gratis_por_dia": 50
+      },
+      "estado": "VERIFICADO",
+      "evidencia": "fases 1 a 4: todas las corridas de agente del proyecto salieron por aquí"
+    },
+
+    "google": {
+      "credencial": "GEMINI_API_KEY",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "prefijo_runtime": "google/",
+      "cuota": {
+        "tipo": "diaria_por_cuenta",
+        "$nota": "Google AI Studio tiene capa gratuita propia. El tope depende del modelo y de la cuenta, así que aquí no se escribe un número que no se ha medido."
+      },
+      "estado": "DECLARADO",
+      "evidencia": "models.dev lo lista con env GEMINI_API_KEY y 16 modelos con tool calling y contexto de hasta 1M. Nunca se ha corrido un agente contra él: hace falta una credencial."
+    }
+  },
+
+  "$descartados": {
+    "$comment": "Se escriben porque descartar sin dejar el motivo obliga a volver a investigarlos cada vez. El motivo es un dato medido contra el catálogo del runtime el 2026-08-25, no una impresión.",
+    "groq": "0 modelos con tool calling y contexto ≥ 200k. No cumple el min_context de REVIEW.",
+    "cerebras": "0 modelos con tool calling y contexto ≥ 200k. Mismo motivo.",
+    "github-copilot": "exige suscripción de Copilot; no es una vía gratuita.",
+    "ollama (local)": "los modelos descargados en esta máquina son de 4B a 8B, con ~32k de contexto: no llegan a los 200k que pide REVIEW. Además no hay GPU operativa, así que iría por CPU. Sigue siendo la única vía gratis ILIMITADA, y por eso vale para contratos de contexto corto; hoy ninguno de los tres agentes lo es."
+  },
+
+  "modelos": {
+    "$comment": "id neutral del contrato → opciones ordenadas. `contexto` y `tool_calling` se comparan contra los requisitos del contrato: una opción que no los cumple NO se usa, ni siquiera como último recurso. Degradar en silencio a un modelo que no cabe es exactamente el fallo que este repositorio existe para no cometer.",
+
+    "nemotron-3-ultra": [
+      {
+        "proveedor": "openrouter",
+        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "contexto": 1000000,
+        "tool_calling": true,
+        "estado": "VERIFICADO"
+      },
+      {
+        "proveedor": "openrouter",
+        "id": "minimax/minimax-m3:free",
+        "contexto": 1048576,
+        "tool_calling": true,
+        "estado": "DECLARADO",
+        "$nota": "mismo proveedor: sirve si el modelo concreto falla, NO si se agotó la cuota diaria."
+      },
+      {
+        "proveedor": "google",
+        "id": "gemini-flash-latest",
+        "contexto": 1048576,
+        "tool_calling": true,
+        "estado": "DECLARADO"
+      }
+    ],
+
+    "nemotron-3-super": [
+      {
+        "proveedor": "openrouter",
+        "id": "nvidia/nemotron-3-super-120b-a12b:free",
+        "contexto": 262144,
+        "tool_calling": true,
+        "estado": "VERIFICADO"
+      },
+      {
+        "proveedor": "google",
+        "id": "gemini-flash-lite-latest",
+        "contexto": 1048576,
+        "tool_calling": true,
+        "estado": "DECLARADO"
+      }
+    ],
+
+    "glm-5.2": [
+      {
+        "proveedor": "openrouter",
+        "id": "z-ai/glm-5.2:free",
+        "contexto": 256000,
+        "tool_calling": true,
+        "estado": "VERIFICADO"
+      }
+    ]
+  }
+}

@@ -88,7 +88,22 @@ function renderPlugin() {
 const RT = JSON.parse(readFileSync(join(HERE, "runtime.json"), "utf8"))
 const check = process.argv.includes("--check")
 
+/**
+ * La elección del relevo, si alguien la escribió.
+ *
+ * El `model_map` del runtime dice qué modelos EXISTEN; la elección dice cuál
+ * tenía cuota cuando se decidió. Por eso manda la elección: un mapa estático no
+ * puede saber que hoy el proveedor de siempre está agotado.
+ *
+ * Sin elección se cae al `model_map`, que es el comportamiento de antes. Un
+ * archivo que no está no es un error: es que nadie corrió el relevo todavía.
+ */
+const ELECCION = existsSync(join(HERE, "eleccion.json"))
+  ? JSON.parse(readFileSync(join(HERE, "eleccion.json"), "utf8")).eleccion ?? {}
+  : {}
+
 const problems = []
+const avisos = []
 const fail = (agent, msg) => problems.push(`${agent}: ${msg}`)
 
 /**
@@ -150,9 +165,15 @@ function render(contract, id) {
   const prompt = readFileSync(join(AGENTS_DIR, id, "prompt.md"), "utf8").trimEnd()
 
   const wanted = contract.model.preferred
-  const model = RT.model_map[wanted]
+  const elegido = ELECCION[wanted]
+  const model = elegido?.runtime_id ?? RT.model_map[wanted]
   if (!model) {
     fail(id, `pide el modelo "${wanted}", que no está en el model_map de ${RT.runtime}`)
+  }
+  // Un proveedor DECLARADO se puede usar, pero no en silencio: quien lea el
+  // resultado tiene que saber que salió de una vía que nadie ha corrido antes.
+  if (elegido && elegido.estado !== "VERIFICADO") {
+    avisos.push(`${id}: corre con ${elegido.proveedor}/${elegido.modelo}, que está ${elegido.estado}, no verificado`)
   }
 
   const head = {
@@ -282,6 +303,13 @@ for (const { id, out, path } of salidas) {
     writeFileSync(path, out)
     console.log(`  ${current === null ? "+" : "~"} ${id}`)
   }
+}
+
+// Antes del corte por desvío: que un agente vaya a correr con un proveedor que
+// nadie ha probado importa igual —o más— cuando además hay desincronización.
+if (avisos.length) {
+  console.log(`\nSin verificar — se puede usar, pero no cuenta como capacidad del sistema:`)
+  for (const a of avisos) console.log(`  ⚠ ${a}`)
 }
 
 if (drift) {

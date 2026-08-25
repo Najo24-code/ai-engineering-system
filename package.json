@@ -5,9 +5,11 @@
   "type": "module",
   "description": "Sistema de ingeniería de software multiagente con fronteras demostradas, no declaradas.",
   "scripts": {
-    "test": "node --test core/policies/policy.test.mjs core/verification/verdict.test.mjs core/flow/dictamen.test.mjs core/verification/cuota.test.mjs core/verification/resultados.test.mjs",
+    "test": "node --test core/policies/policy.test.mjs core/verification/verdict.test.mjs core/flow/dictamen.test.mjs core/verification/cuota.test.mjs core/verification/resultados.test.mjs core/providers/relevo.test.mjs",
     "sync": "node runtimes/opencode/sync.mjs",
     "sync:check": "node runtimes/opencode/sync.mjs --check",
+    "relevo": "node core/providers/elegir.mjs",
+    "relevo:seco": "node core/providers/elegir.mjs --seco",
     "gate:wiring": "node core/verification/wiring.mjs",
     "gate:boundary": "node core/verification/boundary.mjs",
     "$comment": "Los 'gate:' que llaman al modelo (wiring, boundary) cuestan corridas reales y por eso no son parte de 'test'. 'gate:contencion' NO llama a ningun modelo: es determinista y cuesta cero, asi que se puede correr en cada cambio.",
