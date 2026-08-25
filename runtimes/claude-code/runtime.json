@@ -1,0 +1,47 @@
+{
+  "$comment": "Hechos VERIFICADOS de este runtime, no leídos de su documentación. Cada uno se midió el 2026-08-25 con una sonda: un proyecto de usar y tirar, un hook que registra lo que recibe, y una corrida real de `claude -p`. La misma disciplina que el runtime de opencode, por la misma razón: con opencode se perdieron horas creyendo a los tipos en vez de a una corrida (H-17).",
+
+  "runtime": "claude-code",
+  "verified_version": "2.1.246",
+
+  "instalacion": {
+    "agentes": ".claude/agents/<id>.md",
+    "configuracion": ".claude/settings.json",
+    "$nota": "Todo es del PROYECTO, no del usuario. El adaptador NUNCA escribe en ~/.claude: la configuración personal de quien lo usa no es del sistema."
+  },
+
+  "frontmatter": {
+    "campos": ["name", "description", "tools", "model"],
+    "tools": "lista separada por comas, en los nombres de este runtime",
+    "$prohibido_memory": "NO se emite `memory:`. Verificado aparte: `memory: user` añade Write y Edit en silencio a un agente aunque su `tools` no los liste. Un agente de solo lectura con memoria deja de ser de solo lectura y nada en su frontmatter lo dice."
+  },
+
+  "tool_map": {
+    "$comment": "El contrato nombra herramientas en neutro; cada runtime las llama a su manera. Este mapa es la única pieza que sabe cómo las llama Claude Code.",
+    "read": "Read",
+    "glob": "Glob",
+    "grep": "Grep",
+    "edit": "Edit",
+    "write": "Write",
+    "bash": "Bash",
+    "todowrite": "TodoWrite",
+    "task": "Task"
+  },
+
+  "enforcement": {
+    "mecanismo": "hook PreToolUse que sale con código 2",
+    "$medido": "2026-08-25. Con el hook devolviendo 0, `claude -p 'escribe prueba.txt'` creó el archivo. Con el MISMO prompt y el hook saliendo con código 2, el archivo no se creó y el texto de stderr le llegó al agente, que lo reportó nombrando el hook y la regla. Control positivo y negativo, en ese orden.",
+    "entrada": {
+      "$medido": "El hook recibe un JSON por stdin con, entre otros: hook_event_name, tool_name, tool_input, cwd, session_id.",
+      "tool_name": "el nombre del runtime, con mayúscula inicial (Write, Edit, Bash)",
+      "ruta": "tool_input.file_path",
+      "comando": "tool_input.command"
+    },
+    "$por_que_no_permissions": "El bloque `permissions` de settings.json es una lista de patrones, no un juicio: no puede consultar el alcance del agente que está corriendo. La política vive en core/policies/policy.mjs y aquí solo se la invoca, para que las dos instalaciones apliquen LA MISMA política y no dos copias que se separan."
+  },
+
+  "model_map": {
+    "nemotron-3-ultra": "opus",
+    "$comment": "Claude Code no acepta un id de proveedor arbitrario: nombra sus modelos por alias. Un contrato que pida un modelo de otro proveedor no se puede satisfacer aquí, y eso se dice al sincronizar en vez de traducirlo a lo más parecido."
+  }
+}

@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Sistema de ingeniería de software multiagente con fronteras demostradas, no declaradas.",
   "scripts": {
-    "test": "node --test core/policies/policy.test.mjs core/verification/verdict.test.mjs core/flow/dictamen.test.mjs core/verification/cuota.test.mjs core/verification/resultados.test.mjs core/verification/regresion.test.mjs core/providers/relevo.test.mjs",
+    "test": "node --test core/policies/policy.test.mjs core/verification/verdict.test.mjs core/flow/dictamen.test.mjs core/verification/cuota.test.mjs core/verification/resultados.test.mjs core/verification/regresion.test.mjs core/providers/relevo.test.mjs runtimes/claude-code/adapter.test.mjs",
     "sync": "node runtimes/opencode/sync.mjs",
     "sync:check": "node runtimes/opencode/sync.mjs --check",
     "relevo": "node core/providers/elegir.mjs",
@@ -16,6 +16,7 @@
     "gate:contencion": "node core/sandbox/containment.mjs",
     "verdict": "node core/verification/verdict.mjs",
     "flow:review": "node core/flow/review.mjs",
-    "flow:rework": "node core/flow/rework.mjs"
+    "flow:rework": "node core/flow/rework.mjs",
+    "sync:cc": "node runtimes/claude-code/sync.mjs"
   }
 }

@@ -210,13 +210,21 @@ ciclo de tres tiene que ser aburrido de tan confiable.
 
 **Entregable.** Un segundo adaptador de runtime y la entrada desde un issue.
 
-**Gate.**
-- [ ] **G6.1** El mismo contrato de agente corre en dos runtimes distintos.
-- [ ] **G6.2** Cambiar de runtime **no** exige tocar `agents/`.
+**Gate.** **ABIERTA** — 3 cerrados el 2026-08-25, 2 sin empezar.
+- [x] **G6.1** El mismo contrato de agente corre en dos runtimes distintos.
+      Segundo adaptador: `runtimes/claude-code/`, contra Claude Code 2.1.246.
+      Los cuatro contratos se instalan y corren.
+- [x] **G6.2** Cambiar de runtime **no** exige tocar `agents/`.
+      Verificado contra el árbol: lo único añadido es `runtimes/claude-code/`;
+      ni un archivo bajo `agents/` cambió.
 - [ ] **G6.3** Un issue real recorre el ciclo y termina en un PR con su evidencia.
 - [ ] **G6.4** El sistema se instala limpio en una máquina distinta siguiendo el README.
-- [ ] **G6.5** Las fronteras de las fases 1 y 2 siguen siendo reales en el runtime nuevo.
-      Se vuelven a correr las pruebas de fuga; no se dan por heredadas.
+- [x] **G6.5** Las fronteras de las fases 1 y 2 siguen siendo reales en el runtime nuevo.
+      **No se heredaron: se volvieron a correr.** En una sesión real de Claude Code,
+      escribir fuera del alcance quedó NEGADO (`A-ALCANCE`, archivo intacto) y un
+      `ls` NEGADO (`A-COMANDO`); con **control positivo**, escribir dentro del
+      alcance SÍ ocurrió. El mecanismo de enforcement se midió con una sonda antes
+      de escribir el adaptador, no se leyó de la documentación.
 
 **Auditoría.** `docs/audits/fase-6.md`
 
