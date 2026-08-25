@@ -42,7 +42,13 @@ if (!task) {
   process.exit(2)
 }
 
-const CWD = join(ROOT, target)
+/**
+ * El objetivo puede ser `lab` (dentro del repositorio) o la ruta absoluta de un
+ * proyecto de verdad, en cualquier sitio del disco. `join(ROOT, "/tmp/x")` no
+ * devuelve "/tmp/x": devuelve una ruta dentro del repositorio que no existe, y
+ * el flujo se caía con un mensaje que apuntaba al sitio equivocado.
+ */
+const CWD = target.startsWith("/") ? target : join(ROOT, target)
 if (!existsSync(CWD)) {
   console.error(`el objetivo "${target}" no existe`)
   process.exit(2)
@@ -61,8 +67,16 @@ const guardar = (nombre, contenido) => {
   return ruta
 }
 
+/**
+ * El diff se pide DESDE el proyecto y con `--relative`.
+ *
+ * Desde el repositorio del sistema solo funcionaba si el proyecto vivía dentro
+ * de él. Y `--relative` deja las rutas relativas al proyecto, que es la única
+ * convención que significa lo mismo en los dos casos —`lab/` como subdirectorio
+ * y un repositorio ajeno como raíz— y la que espera el verificador.
+ */
 const gitDiff = () =>
-  execFileSync("git", ["-C", ROOT, "diff", "--", target], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 })
+  execFileSync("git", ["-C", CWD, "diff", "--relative"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 })
 
 // La corrida tiene que poder leerse sola. Sin la tarea guardada, la etapa de
 // REVIEW no sabe contra qué juzgar el diff, y "lo que se pidió" acaba siendo lo

@@ -70,7 +70,7 @@ const task = (leer("--task") ?? deLaCorrida("tarea.txt")).trim()
 const target = (leer("--target") ?? deLaCorrida("objetivo.txt", false) ?? "lab").trim()
 const diff = deLaCorrida("cambios.diff")
 const reporteBuild = deLaCorrida("build.md", false)
-const CWD = join(ROOT, target)
+const CWD = target.startsWith("/") ? target : join(ROOT, target)
 
 const guardar = (nombre, contenido) => {
   const ruta = join(DIR, nombre)

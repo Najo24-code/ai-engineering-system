@@ -52,7 +52,7 @@ const pedir = (n) => {
 const task = pedir("tarea.txt").trim()
 const target = (existsSync(join(DIR, "objetivo.txt")) ? readFileSync(join(DIR, "objetivo.txt"), "utf8") : "lab").trim()
 const dictamen = pedir("review.md")
-const CWD = join(ROOT, target)
+const CWD = target.startsWith("/") ? target : join(ROOT, target)
 
 const VUELTA = join(DIR, "vuelta-2")
 mkdirSync(VUELTA, { recursive: true })
@@ -84,7 +84,7 @@ if (b.fallo) {
 }
 console.log("listo")
 
-const diff = execFileSync("git", ["-C", ROOT, "diff", "--", target], {
+const diff = execFileSync("git", ["-C", CWD, "diff", "--relative"], {
   encoding: "utf8",
   maxBuffer: 20 * 1024 * 1024,
 })

@@ -10,18 +10,39 @@
  * Aquí la traducción es explícita y se valida contra hechos verificados
  * del runtime (runtime.json).
  *
- *   node runtimes/opencode/sync.mjs           escribe los archivos
- *   node runtimes/opencode/sync.mjs --check   no escribe; sale 1 si hay desvío
+ *   node runtimes/opencode/sync.mjs                 escribe los archivos en lab/
+ *   node runtimes/opencode/sync.mjs --en <proyecto>  instala el sistema en otro repositorio
+ *   node runtimes/opencode/sync.mjs --check          no escribe; sale 1 si hay desvío
  */
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs"
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 const AGENTS_DIR = join(ROOT, "agents")
-const TARGET_DIR = join(ROOT, "lab", ".opencode", "agents")
+
+/**
+ * A qué proyecto se instala. Por defecto `lab/`, que es el banco de pruebas.
+ *
+ * Existe la bandera `--en` porque un sistema que solo sabe trabajar sobre su
+ * propio laboratorio no está probado, está ensayado. Apuntarlo a un repositorio
+ * de verdad —uno que no conoce, con su propia forma— es la primera prueba
+ * honesta de que los contratos son de agentes y no de este árbol de archivos.
+ */
+const PROYECTO = (() => {
+  const i = process.argv.indexOf("--en")
+  if (i === -1) return join(ROOT, "lab")
+  const r = process.argv[i + 1]
+  if (!r) {
+    console.error("--en necesita una ruta")
+    process.exit(2)
+  }
+  return r.startsWith("/") ? r : join(process.cwd(), r)
+})()
+
+const TARGET_DIR = join(PROYECTO, ".opencode", "agents")
 
 /**
  * El frontmatter solo sabe decir sí o no por herramienta. Para BUILD eso no
@@ -30,7 +51,39 @@ const TARGET_DIR = join(ROOT, "lab", ".opencode", "agents")
  * aquí. Se GENERA desde los mismos contratos para que no exista una segunda
  * versión de la verdad que se desincronice en silencio.
  */
-const SCOPES_PATH = join(ROOT, "lab", ".opencode", "scopes.generated.json")
+const SCOPES_PATH = join(PROYECTO, ".opencode", "scopes.generated.json")
+
+/**
+ * El plugin es la ÚNICA pieza que no puede copiarse tal cual.
+ *
+ * Importa `core/policies/policy.mjs` por una ruta relativa que solo es correcta
+ * si el proyecto vive exactamente donde vive `lab/`. Instalado en un repositorio
+ * de verdad, en cualquier otro sitio del disco, esa ruta no existe y el plugin
+ * no carga — y un policy gate que no carga no avisa: simplemente no gobierna
+ * nada, y la corrida sale igual de bien que si estuviera funcionando.
+ *
+ * Por eso se GENERA con la ruta resuelta a absoluta, y por eso la sustitución
+ * falla ruidosamente si la línea que espera ya no está: prefiero que esto se
+ * caiga aquí a que se caiga en silencio dentro del runtime.
+ */
+const PLUGIN_ORIGEN = join(HERE, "plugins", "policy-gate.ts")
+const IMPORT_RELATIVO = 'import { decidir } from "../../../core/policies/policy.mjs"'
+
+function renderPlugin() {
+  const fuente = readFileSync(PLUGIN_ORIGEN, "utf8")
+  if (!fuente.includes(IMPORT_RELATIVO)) {
+    console.error(`El plugin ya no importa la política como se esperaba:`)
+    console.error(`  esperaba: ${IMPORT_RELATIVO}`)
+    console.error(`  en:       ${PLUGIN_ORIGEN}`)
+    console.error("\nNo se escribió nada. Un plugin instalado con un import roto no gobierna nada.")
+    process.exit(2)
+  }
+  const absoluto = `import { decidir } from ${JSON.stringify(join(ROOT, "core", "policies", "policy.mjs"))}`
+  return fuente.replace(
+    IMPORT_RELATIVO,
+    `// GENERADO: la ruta la resuelve runtimes/opencode/sync.mjs al instalar.\n${absoluto}`,
+  )
+}
 
 const RT = JSON.parse(readFileSync(join(HERE, "runtime.json"), "utf8"))
 const check = process.argv.includes("--check")
@@ -159,7 +212,7 @@ const scopesOut =
   JSON.stringify(
     {
       $comment:
-        "GENERADO por runtimes/opencode/sync.mjs — no editar a mano. Lo lee lab/.opencode/plugins/policy-gate.ts en cada llamada de herramienta. Un agente que no aparece aquí no queda sin gobierno: le siguen aplicando las reglas universales de core/policies/policy.mjs.",
+        "GENERADO por runtimes/opencode/sync.mjs — no editar a mano. Lo lee .opencode/plugins/policy-gate.ts en cada llamada de herramienta. Un agente que no aparece aquí no queda sin gobierno: le siguen aplicando las reglas universales de core/policies/policy.mjs.",
       generado_desde: "agents/*/agent.json",
       agents: scopes,
     },
@@ -175,11 +228,47 @@ if (problems.length) {
 }
 
 let drift = 0
-const salidas = [...rendered.map(({ id, out }) => ({ id, out, path: join(TARGET_DIR, `${id}.md`) })), {
-  id: "scopes.generated.json",
-  out: scopesOut,
-  path: SCOPES_PATH,
-}]
+const salidas = [
+  ...rendered.map(({ id, out }) => ({ id, out, path: join(TARGET_DIR, `${id}.md`) })),
+  { id: "scopes.generated.json", out: scopesOut, path: SCOPES_PATH },
+  { id: "plugins/policy-gate.ts", out: renderPlugin(), path: join(PROYECTO, ".opencode", "plugins", "policy-gate.ts") },
+]
+
+if (!check) {
+  for (const d of [TARGET_DIR, join(PROYECTO, ".opencode", "plugins")]) mkdirSync(d, { recursive: true })
+  ignorarLoInstalado()
+}
+
+/**
+ * Lo que el instalador deja en el proyecto NO es trabajo del proyecto.
+ *
+ * Sin esto, `.opencode/` aparece como un puñado de archivos sin versionar y el
+ * control de alcance del verificador los marca fuera de alcance en TODA corrida
+ * posterior — el sistema se saboteaba a sí mismo al instalarse, y con un motivo
+ * que además suena razonable.
+ *
+ * Se ignora por dentro, con un `.gitignore` propio, para no tocar el del
+ * proyecto. Y solo si no había uno: este archivo es del proyecto en cuanto
+ * alguien lo edita, y pisárselo en cada sync sería otra sorpresa.
+ */
+function ignorarLoInstalado() {
+  const ruta = join(PROYECTO, ".opencode", ".gitignore")
+  if (existsSync(ruta)) return
+  writeFileSync(
+    ruta,
+    [
+      "# GENERADO por ai-engineering-system al instalarse.",
+      "#",
+      "# Nada de esto se versiona. Son artefactos de UNA máquina concreta: el",
+      "# plugin apunta a la política del sistema por ruta absoluta. Y sobre todo,",
+      "# no son trabajo de este proyecto: si se versionaran, el control de alcance",
+      "# del verificador los leería como archivos que un agente tocó sin permiso.",
+      "*",
+      "",
+    ].join("\n"),
+  )
+  console.log("  + .gitignore (lo instalado no es trabajo del proyecto)")
+}
 
 for (const { id, out, path } of salidas) {
   const current = existsSync(path) ? readFileSync(path, "utf8") : null
@@ -200,3 +289,4 @@ if (drift) {
   process.exit(1)
 }
 console.log(`\n${ids.length} agente(s) sincronizado(s) con ${RT.runtime} ${RT.verified_version}.`)
+if (!check) console.log(`Instalado en: ${PROYECTO}/.opencode/`)

@@ -29,3 +29,8 @@ runs/
 # La evidencia citada por una auditoria SI se versiona: sin ella el informe
 # es una afirmacion sin respaldo.
 !docs/audits/evidence/*.jsonl
+
+# El plugin instalado se GENERA (runtimes/opencode/sync.mjs) con la ruta de la
+# politica resuelta a absoluta: pertenece a una maquina concreta, no al
+# repositorio. El canonico vive en runtimes/opencode/plugins/.
+lab/.opencode/plugins/policy-gate.ts
