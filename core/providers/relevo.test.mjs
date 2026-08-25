@@ -291,12 +291,40 @@ test("el catálogo real no promete como verificado lo que nadie ha corrido", () 
       assert.ok(["VERIFICADO", "DECLARADO"].includes(o.estado), `${o.id} sin estado declarado`)
     }
   }
-  const verificados = Object.values(CATALOGO_REAL.modelos)
-    .filter(Array.isArray)
-    .flat()
-    .filter((o) => o.estado === "VERIFICADO")
-  assert.ok(
-    verificados.every((o) => o.proveedor === "openrouter"),
-    "solo OpenRouter ha corrido agentes de verdad; marcar otro como VERIFICADO exige la corrida",
-  )
+  // Esto era una lista fija ("solo openrouter"), y el 2026-08-25 se puso en rojo
+  // cuando opencode-zen se ganó el sello con la corrida de G4.5. Un guardián que
+  // hay que editar cada vez que el mundo avanza se acaba editando sin pensar, que
+  // es justo lo que no puede pasar aquí. Lo que defendía de verdad no era la
+  // lista: era que nadie escriba VERIFICADO sin poder decir CON QUÉ corrida.
+  //
+  // El primer intento pedía "que haya un texto en `evidencia`". No servía, y se
+  // demostró con control positivo: `google` ya tenía un `evidencia` largo que
+  // describe su ficha en un catálogo de modelos, no una corrida — así que pasaba
+  // el guardián sin haber corrido nada. Pedir prosa no es pedir prueba.
+  //
+  // Lo que se pide ahora es una FORMA que no se rellena de pasada: fecha, la
+  // corrida concreta, el proyecto y qué se midió. Límite escrito, porque este
+  // control tiene uno: no impide que alguien invente los cuatro campos. Impide
+  // el ascenso por descuido, que es el que de verdad ocurre — nadie falsifica un
+  // id de corrida sin darse cuenta de lo que está haciendo.
+  const CAMPOS = ["fecha", "corrida", "proyecto", "medido"]
+  for (const [nombre, p] of Object.entries(CATALOGO_REAL.proveedores)) {
+    if (p.estado !== "VERIFICADO") continue
+    for (const c of CAMPOS) {
+      assert.ok(
+        typeof p.verificado_en?.[c] === "string" && p.verificado_en[c].length > 3,
+        `"${nombre}" dice VERIFICADO pero su verificado_en no dice "${c}"`,
+      )
+    }
+  }
+  // Y un modelo no puede estar verificado sobre un proveedor que no lo está:
+  // sería la conclusión sin la premisa.
+  for (const o of Object.values(CATALOGO_REAL.modelos).filter(Array.isArray).flat()) {
+    if (o.estado !== "VERIFICADO") continue
+    assert.equal(
+      CATALOGO_REAL.proveedores[o.proveedor]?.estado,
+      "VERIFICADO",
+      `"${o.id}" dice VERIFICADO pero su proveedor "${o.proveedor}" no lo está`,
+    )
+  }
 })

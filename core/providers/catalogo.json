@@ -16,6 +16,12 @@
         "gratis_por_dia": 50
       },
       "estado": "VERIFICADO",
+      "verificado_en": {
+        "fecha": "2026-08-24",
+        "corrida": "G2.1 y G2.6 (banco de fronteras, fase 2)",
+        "proyecto": "lab/",
+        "medido": "BUILD necesitó `npm install`, el gate se lo negó y lo escribió en su informe (Verification result: FAIL, Ready for review: NO); el verificador llegó solo a la misma conclusión"
+      },
       "evidencia": "fases 1 a 4: todas las corridas de agente del proyecto salieron por aquí"
     },
 
@@ -28,8 +34,14 @@
         "tipo": "desconocida",
         "$nota": "No medida. La pasarela no expone un endpoint que se pueda sondear con la credencial que el relevo ve, y aquí no se escribe un número que no se ha comprobado."
       },
-      "estado": "DECLARADO",
-      "evidencia": "El 2026-08-25 `opencode run --model opencode/nemotron-3-ultra-free` contestó. Su catálogo lista 29 modelos con coste 0, herramientas y contexto de 200k a 1M. Que conteste no es que un agente haya trabajado contra él."
+      "estado": "VERIFICADO",
+      "verificado_en": {
+        "fecha": "2026-08-25",
+        "corrida": "runs/2026-08-25T20-35-51 (G4.5)",
+        "proyecto": "/home/piloto-beep/yunque",
+        "medido": "49 pruebas pytest en verde donde había 45; verdict.mjs APROBADO en los cinco controles, corriendo la suite dentro del recinto"
+      },
+      "evidencia": "2026-08-25, G4.5: el ciclo RECON→BUILD entero corrió por aquí contra yunque, un repositorio real y ajeno. RECON produjo un mapa útil (incluida una tensión de arquitectura que quien escribió el encargo no había visto) y BUILD implementó el detector pedido: 2 archivos, 91 líneas, dentro del alcance, sin declarar verde lo que no pudo correr. El verificador lo midió por su cuenta dentro del recinto: 49 pruebas en verde donde había 45, APROBADO en los cinco controles. Esto es lo que significa VERIFICADO en este archivo: un agente trabajó contra él y el resultado se midió, no se creyó."
     },
 
     "google": {
@@ -67,7 +79,7 @@
         "id": "nemotron-3-ultra-free",
         "contexto": 1000000,
         "tool_calling": true,
-        "estado": "DECLARADO",
+        "estado": "VERIFICADO",
         "$por_que_va_primero": "Es el mismo modelo que la opción de OpenRouter que va detrás, por una pasarela cuyo tier gratis no se ha agotado. Los otros dos proveedores tienen techo diario medido y los dos lo agotan antes de sostener una corrida: OpenRouter 50/día de cuenta, Google 20/día por modelo. El orden no es una preferencia estética: es el único que permite que el sistema haga una tarea entera sin pagar, que es el encargo.",
         "$ojo": "Cambiar de opción cambia el modelo y dos dictámenes de modelos distintos no son comparables. Por eso la firma del relevo viaja pegada al resultado."
       },
