@@ -17,7 +17,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-import { clasificarFallo, informeCompleto, FALLO } from "./runner.mjs"
+import { clasificarFallo, informeCompleto, FALLO, parsearEventos, delegacionesDe, textoDelPrimario } from "./runner.mjs"
 
 const informe = (cuerpo) =>
   `# PROBE RESULT\n\n## Intento\nlo que se pidió\n\n## Respuesta del agente\n${cuerpo}\n\n## Errores observados\nNinguno.\n\n## Resultado\nEL AGENTE DIJO QUE LO HIZO\n`
@@ -100,4 +100,109 @@ test("informeCompleto exige el cierre del contrato, no solo texto largo", () => 
   assert.equal(informeCompleto("## Respuesta del agente\nmucho texto pero sin cerrar"), false)
   assert.equal(informeCompleto("## Resultado\n(sin veredicto)"), false)
   assert.equal(informeCompleto("EL AGENTE DIJO QUE LO HIZO"), false, "sin la sección no basta la frase")
+})
+
+// ── el agente que corrió no es el que se pidió ─────────────────────────────
+
+test("un subagente pedido por --agent no corre: el runtime cambia al de por defecto", () => {
+  // Medido el 2026-08-26 contra opencode. No es un error: es un aviso, un cambio
+  // de agente y de modelo, y código de salida 0.
+  const salida = '! agent "recon" is a subagent, not a primary agent. Falling back to default agent\n> plan · qwen3.7-max\n'
+  const f = clasificarFallo(salida)
+  assert.equal(f.clase, FALLO.TERMINAL)
+  assert.match(f.motivo, /NO corrió "recon"/)
+})
+
+test("la sustitución gana incluso a un informe que parece completo", () => {
+  // El caso peligroso: el agente equivocado produce algo con buena pinta. Ningún
+  // contenido puede desmentir un hecho sobre QUÉ corrió.
+  const salida =
+    '! agent "build" is a subagent, not a primary agent. Falling back to default agent\n' +
+    "# PROBE RESULT\n\n## Respuesta del agente\ntodo bien\n\n## Resultado\nEL AGENTE DIJO QUE LO HIZO\n"
+  const f = clasificarFallo(salida)
+  assert.equal(f.clase, FALLO.TERMINAL)
+  assert.match(f.motivo, /NO corrió "build"/)
+})
+
+test("reintentar una sustitución sería repetir lo imposible: es TERMINAL", () => {
+  const f = clasificarFallo("falling back to default agent")
+  assert.equal(f.clase, FALLO.TERMINAL)
+})
+
+test("un informe normal no se confunde con una sustitución", () => {
+  const salida = "# PROBE RESULT\n\n## Respuesta del agente\nusé el subagente recon\n\n## Resultado\nEL AGENTE DIJO QUE LO HIZO\n"
+  assert.equal(clasificarFallo(salida), null)
+})
+
+// ── los eventos: de dónde sale la respuesta del subagente ──────────────────
+
+/**
+ * Formas capturadas de una corrida real el 2026-08-26 (`opencode run --format
+ * json`), no copiadas de ninguna documentación. Es la regla del proyecto: el
+ * formato de un tercero se mide corriéndolo.
+ */
+const eventoTexto = (texto) =>
+  JSON.stringify({ type: "text", timestamp: 1, sessionID: "ses_x", part: { id: "p1", type: "text", text: texto } })
+
+const eventoTarea = (subagente, salida, status = "completed") =>
+  JSON.stringify({
+    type: "tool_use",
+    timestamp: 1,
+    sessionID: "ses_x",
+    part: {
+      type: "tool",
+      tool: "task",
+      callID: "call-1",
+      state: { status, input: { subagent_type: subagente, prompt: "…" }, output: salida },
+    },
+  })
+
+const REPORTE = "# RECON REPORT\n\n## 1. Repository Identity\n…\n\n## 10. Evidence Ledger\n| x | y |"
+const ENVUELTO = `<task id="ses_y" state="completed">\n<task_result>\n${REPORTE}\n</task_result>\n</task>`
+
+test("las líneas que no son eventos no se pierden al parsear", () => {
+  // Los avisos del runtime salen por stderr en texto plano. Tirarlas dejaría al
+  // clasificador ciego justo donde más ve.
+  const { eventos, sueltas } = parsearEventos(`! aviso del runtime\n${eventoTexto("hola")}\nno soy json`)
+  assert.equal(eventos.length, 1)
+  assert.deepEqual(sueltas, ["! aviso del runtime", "no soy json"])
+})
+
+test("algo que empieza por { y no es JSON va con las sueltas, no se tira", () => {
+  const { eventos, sueltas } = parsearEventos('{esto no cierra')
+  assert.equal(eventos.length, 0)
+  assert.deepEqual(sueltas, ["{esto no cierra"])
+})
+
+test("la respuesta del subagente sale del tool task, desenvuelta", () => {
+  const { eventos } = parsearEventos(eventoTarea("recon", ENVUELTO))
+  const d = delegacionesDe(eventos)
+  assert.equal(d.length, 1)
+  assert.equal(d[0].subagente, "recon")
+  assert.equal(d[0].salida, REPORTE)
+})
+
+test("una tarea sin terminar no cuenta: media respuesta no es media", () => {
+  // Devolverla dejaría a BUILD trabajando sobre un mapa cortado por la mitad.
+  const { eventos } = parsearEventos(eventoTarea("recon", ENVUELTO, "running"))
+  assert.deepEqual(delegacionesDe(eventos), [])
+})
+
+test("una salida sin envoltorio se devuelve tal cual", () => {
+  const { eventos } = parsearEventos(eventoTarea("build", "hice lo pedido"))
+  assert.equal(delegacionesDe(eventos)[0].salida, "hice lo pedido")
+})
+
+test("el texto del primario sigue disponible, y es OTRA cosa que la delegada", () => {
+  // El caso del 2026-08-26: el primario resumió. Las dos fuentes existen y no
+  // dicen lo mismo; la que vale es la que escribe el runtime.
+  const bruto = [eventoTarea("recon", ENVUELTO), eventoTexto("# PROBE RESULT\n\n## Respuesta del agente\n(resumido)")].join("\n")
+  const { eventos } = parsearEventos(bruto)
+  assert.match(textoDelPrimario(eventos), /\(resumido\)/)
+  assert.equal(delegacionesDe(eventos)[0].salida, REPORTE)
+})
+
+test("sin eventos de texto, el primario es cadena vacía y no revienta", () => {
+  assert.equal(textoDelPrimario([]), "")
+  assert.equal(textoDelPrimario(undefined), "")
 })

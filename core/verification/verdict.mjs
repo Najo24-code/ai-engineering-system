@@ -186,6 +186,45 @@ export function archivosDelDiff(proyecto, base) {
   return [...new Set([...salida.split("\n"), ...sinSeguir.split("\n")].map((l) => l.trim()).filter(Boolean))]
 }
 
+/**
+ * El diff DE VERDAD: lo modificado y lo que nació sin añadirse al índice.
+ *
+ * `git diff` no ve un archivo que nunca se añadió, y crear archivos nuevos es lo
+ * más normal que hace una implementación. El 2026-08-26, contra `lab/`, BUILD
+ * escribió `src/math.js` y `tests/math.test.js` correctos y el flujo guardó un
+ * `cambios.diff` **vacío**, anunció «Archivos tocados: ninguno» y dejó la etapa
+ * de revisión abortando con «BUILD no cambió nada». Trabajo impecable, evidencia
+ * en blanco, y la culpa aparente sobre el agente. En yunque no se vio por pura
+ * suerte: allí tocó dos archivos que ya existían.
+ *
+ * Los nuevos se renderizan con `git diff --no-index` contra `/dev/null`, que
+ * produce un diff unificado de verdad —con su `+++ b/<ruta>` y su `new file
+ * mode`— **sin tocar el índice**. `git add -N` daría lo mismo mutando el
+ * repositorio de otro, y este sistema ya sabotéo una vez al proyecto que venía
+ * a ayudar.
+ */
+export function diffCompleto(proyecto, base = "HEAD") {
+  const seguidos = git(proyecto, ["diff", "--relative", base])
+  const nuevos = git(proyecto, ["ls-files", "--others", "--exclude-standard"])
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  const trozos = []
+  for (const rel of nuevos) {
+    try {
+      // Si saliera con 0 es que no hay diferencia contra /dev/null, o sea que el
+      // archivo está vacío: no hay nada que renderizar.
+      execFileSync("git", ["diff", "--no-index", "--", "/dev/null", rel], { cwd: proyecto, encoding: "utf8" })
+    } catch (e) {
+      // `--no-index` termina con 1 cuando hay diferencias, que aquí es siempre.
+      // El diff viene por stdout; sin él no se inventa nada.
+      if (e.stdout) trozos.push(e.stdout)
+    }
+  }
+  return [seguidos, ...trozos].filter(Boolean).join("")
+}
+
 function controlAlcance({ proyecto, base, alcance, afirmado }) {
   if (!alcance?.length) {
     return hallazgo("alcance", false, afirmado, null, "no se declaró alcance; sin alcance no hay nada contra qué medir")
@@ -383,7 +422,9 @@ function controlRegresion({ proyecto, base, declarados }) {
  * opuestos, y por eso hacen falta los dos. El porqué medido está en `sombra.mjs`.
  */
 function controlSombra({ proyecto, base }) {
-  const diff = git(proyecto, ["diff", "--relative", base])
+  // Con el diff pelado, un test duplicado dentro de un archivo de test RECIÉN
+  // CREADO quedaba fuera del control: `git diff` no ve lo que no se añadió.
+  const diff = diffCompleto(proyecto, base)
 
   // El contenido FINAL, que es donde se ve la colisión: el diff enseña las
   // líneas que entran, no con quién se encuentran al llegar.

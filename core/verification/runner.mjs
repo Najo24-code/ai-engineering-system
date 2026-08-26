@@ -27,7 +27,84 @@ import { fileURLToPath } from "node:url"
 const OPENCODE = `${process.env.HOME}/.opencode/bin/opencode`
 const CATALOGO = join(dirname(fileURLToPath(import.meta.url)), "..", "providers", "catalogo.json")
 
-const INVOCACION = 'cd "$OC_CWD" && "$OC_BIN" run --agent "$OC_AGENT" "$OC_MSG"'
+/**
+ * `--format json` no es un lujo de formato: es de dónde sale la verdad.
+ *
+ * Con la salida bonita, lo único que se puede guardar es el mensaje final del
+ * agente primario, y ese mensaje lo escribe el modelo. El contrato de PROBE le
+ * ordena pegar la respuesta del subagente «verbatim. Do not summarize». Medido
+ * el 2026-08-26: **a veces obedece y a veces resume.** En la corrida contra
+ * yunque resumió, y lo que quedó en `recon.md` fue «*see the full task result
+ * above… summarized below*» — sin el Evidence Ledger, que es el dispositivo
+ * entero del contrato de RECON contra la alucinación. Ese resumen es lo que
+ * viajó a BUILD como mapa, y llevaba dentro un número falso.
+ *
+ * Con `--format json` sale el flujo de eventos, y el resultado del tool `task`
+ * **lo escribe el runtime**, no el modelo. Ahí está el reporte del subagente
+ * entero, siempre, obedezca o no el primario. La regla es la de siempre: no se
+ * le pide prosa a quien se está vigilando.
+ */
+const INVOCACION = 'cd "$OC_CWD" && "$OC_BIN" run --agent "$OC_AGENT" --format json "$OC_MSG"'
+
+/**
+ * Separa los eventos NDJSON de lo que no es un evento.
+ *
+ * Las líneas sueltas importan tanto como los eventos: los avisos del runtime
+ * —el de la sustitución de agente, por ejemplo— salen por stderr en texto
+ * plano, y perderlas al parsear dejaría al clasificador ciego justo donde más
+ * ve.
+ */
+export function parsearEventos(bruto) {
+  const eventos = []
+  const sueltas = []
+  for (const linea of String(bruto ?? "").split("\n")) {
+    const t = linea.trim()
+    if (!t) continue
+    if (t.startsWith("{")) {
+      try {
+        eventos.push(JSON.parse(t))
+        continue
+      } catch {
+        // Parecía un evento y no lo era. Va con las sueltas, no se tira.
+      }
+    }
+    sueltas.push(linea)
+  }
+  return { eventos, sueltas }
+}
+
+/**
+ * Lo que el subagente devolvió de verdad, sacado del resultado del tool `task`.
+ *
+ * Forma medida el 2026-08-26, no leída de ninguna documentación:
+ * `{type:"tool_use", part:{tool:"task", state:{status, input:{subagent_type},
+ * output}}}`, y el `output` viene envuelto en `<task id=…><task_result>…`.
+ *
+ * Solo cuentan las tareas COMPLETADAS. Una a medias no es media respuesta: es
+ * ninguna, y devolverla dejaría a BUILD trabajando sobre un mapa cortado.
+ */
+export function delegacionesDe(eventos) {
+  const desenvolver = (texto) => {
+    const m = /<task_result>\s*([\s\S]*?)\s*<\/task_result>/.exec(String(texto ?? ""))
+    return (m ? m[1] : String(texto ?? "")).trim()
+  }
+  return (eventos ?? [])
+    .filter((e) => e?.type === "tool_use" && e?.part?.tool === "task" && e?.part?.state?.status === "completed")
+    .map((e) => ({
+      subagente: e.part.state.input?.subagent_type ?? null,
+      salida: desenvolver(e.part.state.output),
+    }))
+    .filter((d) => d.salida)
+}
+
+/** El mensaje final del primario: lo que se guardaba antes, y sigue sirviendo de contexto. */
+export function textoDelPrimario(eventos) {
+  return (eventos ?? [])
+    .filter((e) => e?.type === "text")
+    .map((e) => e.part?.text ?? "")
+    .join("")
+    .trim()
+}
 
 /**
  * Un fallo que se arregla esperando diez segundos y uno que no se arregla nunca
@@ -72,8 +149,35 @@ export function informeCompleto(salida) {
 }
 
 export function clasificarFallo(salida) {
-  // Lo primero de todo: si hay informe completo, hubo corrida. Lo que venga
-  // después son frases DENTRO del trabajo del agente, no errores del proveedor.
+  // ANTES QUE NADA, incluso antes del informe completo: ¿corrió el agente que se
+  // pidió, o corrió otro?
+  //
+  // Medido el 2026-08-26: `opencode run --agent recon` con un agente declarado
+  // `mode: subagent` NO falla. Avisa por stderr con un `!`, **cambia al agente
+  // por defecto**, corre con OTRO prompt y OTRO modelo, y termina con código 0.
+  //
+  // Es un generador de verdes falsos de primera clase, y en la dirección más
+  // cara: quien lanzara `--agent build` creería estar corriendo BUILD bajo su
+  // contrato —su alcance de escritura, sus comandos, sus prohibiciones— y estaría
+  // corriendo el agente por defecto, que no aparece en `scopes.generated.json` y
+  // por tanto no tiene alcance que aplicarle. El trabajo saldría, el informe
+  // parecería normal, y la única señal sería un renglón de aviso.
+  //
+  // Va delante del informe completo a propósito: la sustitución es un hecho sobre
+  // QUÉ corrió, y ningún contenido del informe puede desmentirlo. Un informe con
+  // buena pinta escrito por el agente equivocado es exactamente el caso peligroso.
+  const sustituido = /agent "([^"]+)" is a subagent, not a primary agent|falling back to (?:the )?default agent/i.exec(salida)
+  if (sustituido) {
+    return {
+      motivo: sustituido[1]
+        ? `el runtime NO corrió "${sustituido[1]}": es un subagente y se cambió al agente por defecto`
+        : "el runtime cambió al agente por defecto: lo que corrió no es el agente que se pidió",
+      clase: FALLO.TERMINAL,
+    }
+  }
+
+  // Si hay informe completo, hubo corrida. Lo que venga después son frases
+  // DENTRO del trabajo del agente, no errores del proveedor.
   if (informeCompleto(salida)) return null
 
   // Lo terminal se mira PRIMERO: el runtime envuelve el 429 del proveedor en su
@@ -168,11 +272,13 @@ export function corridaFallida(salida) {
  */
 export function correrAgente({ agente, mensaje, cwd, intentos = 3, timeoutMs = 8 * 60 * 1000 }) {
   let salida = ""
+  let delegada = null
   let fallo = null
 
   for (let intento = 1; intento <= intentos; intento++) {
+    let bruto = ""
     try {
-      salida = execFileSync("bash", ["-c", INVOCACION], {
+      bruto = execFileSync("bash", ["-c", INVOCACION], {
         encoding: "utf8",
         timeout: timeoutMs,
         maxBuffer: 20 * 1024 * 1024,
@@ -186,18 +292,39 @@ export function correrAgente({ agente, mensaje, cwd, intentos = 3, timeoutMs = 8
         },
       })
     } catch (err) {
-      salida = `${err.stdout ?? ""}${err.stderr ?? ""}`
-      if (err.killed) salida += "\n[la corrida se agotó antes de terminar]"
+      bruto = `${err.stdout ?? ""}${err.stderr ?? ""}`
+      if (err.killed) bruto += "\n[la corrida se agotó antes de terminar]"
     }
 
+    // El flujo de eventos se traduce a algo legible ANTES de clasificar. Si se
+    // clasificara el JSON crudo, cada frase del informe del agente —que viaja
+    // dentro de una cadena JSON— entraría en el mismo saco que los errores del
+    // runtime, y `informeCompleto` no encontraría sus secciones porque los
+    // saltos de línea están escapados. Sería deshacer el arreglo del 401.
+    const { eventos, sueltas } = parsearEventos(bruto)
+    const primario = textoDelPrimario(eventos)
+    salida = [...sueltas, primario].filter(Boolean).join("\n")
+
+    const delegaciones = delegacionesDe(eventos)
+    delegada = delegaciones.length ? delegaciones.map((d) => d.salida).join("\n\n") : null
+
     fallo = clasificarFallo(salida)
+
+    // Evidencia positiva más fuerte que la del informe: si hay un `task`
+    // COMPLETADO con salida, el subagente corrió y contestó. Eso lo escribe el
+    // runtime, no el modelo, así que no hay prosa que pueda fingirlo.
+    //
+    // La sustitución de agente es la excepción y sigue mandando: un `task`
+    // completado por el agente equivocado no es la corrida que se pidió.
+    if (fallo && delegada && fallo.clase !== FALLO.TERMINAL) fallo = null
+
     if (!fallo) break
     // Reintentar una cuota agotada es esperar diez segundos a que pase un día.
     if (fallo.clase === FALLO.TERMINAL) break
     if (intento < intentos) execFileSync("sleep", ["10"])
   }
 
-  return { salida, fallo: fallo?.motivo ?? null, clase: fallo?.clase ?? null }
+  return { salida, delegada, fallo: fallo?.motivo ?? null, clase: fallo?.clase ?? null }
 }
 
 /** El mensaje estándar para hacer que un subagente intente algo, vía el primario `probe`. */

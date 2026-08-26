@@ -24,6 +24,7 @@ import { execFileSync } from "node:child_process"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
+import { diffCompleto } from "../verification/verdict.mjs"
 import { parsearReferencia, motivosParaNoEntrar, componerTarea, traerIssue } from "./issue.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -78,8 +79,7 @@ const guardar = (nombre, contenido) => {
  * convención que significa lo mismo en los dos casos —`lab/` como subdirectorio
  * y un repositorio ajeno como raíz— y la que espera el verificador.
  */
-const gitDiff = () =>
-  execFileSync("git", ["-C", CWD, "diff", "--relative"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 })
+const gitDiff = () => diffCompleto(CWD)
 
 // ── de dónde sale la tarea ─────────────────────────────────────────────────
 
@@ -158,8 +158,12 @@ if (!soloBuild) {
     process.exit(4)
   }
 
-  reporteRecon = limpio(r.salida)
-  guardar("recon.md", r.salida)
+  // El reporte del SUBAGENTE, no el mensaje del primario. La diferencia es el
+  // Evidence Ledger entero: `r.salida` es prosa que el modelo puede resumir,
+  // `r.delegada` la escribe el runtime. El porqué largo está en runner.mjs.
+  reporteRecon = limpio(r.delegada ?? r.salida)
+  guardar("recon.md", reporteRecon)
+  if (!r.delegada) console.log("\n⚠️  sin resultado delegado: se guardó el mensaje del primario, que puede venir resumido")
   console.log(`listo (${reporteRecon.split("\n").length} líneas)`)
 }
 
@@ -179,7 +183,7 @@ const b = correrAgente({
   timeoutMs: 15 * 60 * 1000,
 })
 
-guardar("build.md", b.salida)
+guardar("build.md", b.delegada ?? b.salida)
 
 if (b.fallo) {
   console.log(`NO CORRIÓ (${b.fallo})`)

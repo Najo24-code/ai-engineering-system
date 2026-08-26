@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { veredicto, leerTap, citasRotas, correrSuiteAislada } from "./verdict.mjs"
+import { veredicto, leerTap, citasRotas, correrSuiteAislada, diffCompleto } from "./verdict.mjs"
 
 /**
  * Las credenciales de mentira se ARMAN en tiempo de ejecución, nunca se escriben
@@ -291,4 +291,59 @@ test("la línea se comprueba contra el archivo resuelto, no contra su nombre", (
   const rotas = citasRotas(proyecto, "ver `corto.py:99`")
   assert.equal(rotas.length, 1)
   assert.match(rotas[0].motivo, /tiene 2 líneas/)
+})
+
+// ── el diff completo: lo modificado Y lo que nació sin añadirse ────────────
+
+test("un archivo nuevo sin añadir SÍ aparece en el diff completo", () => {
+  // El 2026-08-26 esto dejó `cambios.diff` vacío sobre dos archivos de trabajo
+  // correcto, y la etapa de revisión abortó con «BUILD no cambió nada».
+  const proyecto = repoDePrueba({ "src/viejo.js": "module.exports = 1\n" })
+  writeFileSync(join(proyecto, "src", "nuevo.js"), "module.exports = 2\n")
+
+  const diff = diffCompleto(proyecto)
+  assert.match(diff, /\+\+\+ b\/src\/nuevo\.js/)
+  assert.match(diff, /new file mode/)
+  assert.match(diff, /^\+module\.exports = 2$/m)
+  limpiar(proyecto)
+})
+
+test("lo modificado y lo nuevo salen juntos, en un solo diff", () => {
+  const proyecto = repoDePrueba({ "src/viejo.js": "module.exports = 1\n" })
+  writeFileSync(join(proyecto, "src", "viejo.js"), "module.exports = 99\n")
+  writeFileSync(join(proyecto, "src", "nuevo.js"), "module.exports = 2\n")
+
+  const diff = diffCompleto(proyecto)
+  assert.match(diff, /\+\+\+ b\/src\/viejo\.js/)
+  assert.match(diff, /\+\+\+ b\/src\/nuevo\.js/)
+  limpiar(proyecto)
+})
+
+test("un árbol sin tocar da un diff vacío, no ruido", () => {
+  // El control positivo: si esto devolviera algo, la etapa de revisión creería
+  // que hay trabajo donde no lo hay.
+  const proyecto = repoDePrueba({ "src/viejo.js": "module.exports = 1\n" })
+  assert.equal(diffCompleto(proyecto).trim(), "")
+  limpiar(proyecto)
+})
+
+test("lo ignorado por .gitignore no se cuela como trabajo del agente", () => {
+  const proyecto = repoDePrueba({ "src/a.js": "1\n", ".gitignore": "basura/\n" })
+  mkdirSync(join(proyecto, "basura"), { recursive: true })
+  writeFileSync(join(proyecto, "basura", "cache.txt"), "no soy trabajo\n")
+  assert.equal(diffCompleto(proyecto).trim(), "")
+  limpiar(proyecto)
+})
+
+test("un test duplicado dentro de un archivo de test NUEVO también se caza", () => {
+  // Antes quedaba fuera del control de sombra: el diff pelado no lo veía.
+  const proyecto = repoDePrueba({ "src/a.py": "x = 1\n" })
+  mkdirSync(join(proyecto, "tests"), { recursive: true })
+  writeFileSync(join(proyecto, "tests", "test_nuevo.py"), "def test_x():\n    pass\n\ndef test_x():\n    pass\n")
+
+  const v = veredicto({ proyecto, alcance: ["**"], comando: ["true"] })
+  const sombra = v.controles.find((c) => c.control === "sombra")
+  assert.equal(sombra.aprueba, false)
+  assert.match(sombra.detalle, /test_x/)
+  limpiar(proyecto)
 })

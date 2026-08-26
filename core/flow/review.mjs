@@ -174,14 +174,14 @@ const mensaje =
 
 process.stdout.write("\nREVIEW juzgando ....................... ")
 const r = correrAgente({ agente: "probe", cwd: CWD, mensaje: ordenDelegada("review", mensaje), timeoutMs: 15 * 60 * 1000 })
-guardar("review.md", r.salida)
+guardar("review.md", r.delegada ?? r.salida)
 
 if (r.fallo) {
   console.log(`NO CORRIÓ (${r.fallo})`)
   console.error(`\nREVIEW no llegó a dictaminar. Salida cruda en ${corrida}/review.md`)
   process.exit(4)
 }
-const dictamen = r.salida.replace(/\x1b?\[[0-9;]*m/g, "")
+const dictamen = (r.delegada ?? r.salida).replace(/\x1b?\[[0-9;]*m/g, "")
 console.log("listo")
 
 // ── 3. las citas del dictamen se auditan una por una ────────────────────────

@@ -23,6 +23,7 @@ import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
+import { diffCompleto } from "../verification/verdict.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -76,7 +77,7 @@ console.log(`Tarea: ${task}\n`)
 process.stdout.write("BUILD  arreglando lo señalado ......... ")
 
 const b = correrAgente({ agente: "probe", cwd: CWD, mensaje: ordenDelegada("build", mensaje), timeoutMs: 15 * 60 * 1000 })
-guardar("build.md", b.salida)
+guardar("build.md", b.delegada ?? b.salida)
 
 if (b.fallo) {
   console.log(`NO CORRIÓ (${b.fallo})`)
@@ -84,10 +85,7 @@ if (b.fallo) {
 }
 console.log("listo")
 
-const diff = execFileSync("git", ["-C", CWD, "diff", "--relative"], {
-  encoding: "utf8",
-  maxBuffer: 20 * 1024 * 1024,
-})
+const diff = diffCompleto(CWD)
 guardar("cambios.diff", diff)
 
 const registro = join(CWD, ".opencode", "policy-gate.jsonl")
