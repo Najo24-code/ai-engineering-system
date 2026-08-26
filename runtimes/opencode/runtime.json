@@ -1,8 +1,8 @@
 {
-  "$comment": "Hechos VERIFICADOS del runtime, no supuestos. Cada campo se comprobó contra opencode 1.18.18 en esta máquina el 2026-08-20, y las fronteras además se comprobaron EJECUTANDO (core/verification/boundary.mjs), no leyendo el esquema. Al subir de versión hay que volver a verificarlo Y volver a correr el banco: este archivo caduca.",
+  "$comment": "Hechos VERIFICADOS del runtime, no supuestos. Revalidados contra opencode 1.18.23 el 2026-08-26 corriendo el banco de fronteras (core/verification/boundary.mjs review): write, bash y edit CONTENIDOS POR PERMISO, cada uno con control positivo que discrimina. La revalidacion la disparo el propio control de version, que descubrio que el sello decia 1.18.18 mientras estaba instalado 1.18.23. Al subir de version hay que volver a verificarlo Y volver a correr el banco: este archivo caduca, y ahora runtimes/version.mjs avisa cuando ha caducado.",
   "runtime": "opencode",
-  "verified_version": "1.18.18",
-  "verified_at": "2026-08-20",
+  "verified_version": "1.18.23",
+  "verified_at": "2026-08-26",
   "provider": "openrouter",
   "model_map": {
     "$comment": "Traduce el id neutral del contrato al id que ESTE runtime ofrece. Es la única pieza que sabe de proveedores; por eso cambiar de runtime no obliga a tocar agents/.",
