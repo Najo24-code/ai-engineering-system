@@ -218,13 +218,32 @@ ciclo de tres tiene que ser aburrido de tan confiable.
 
 **Entregable.** El orquestador y su política de decisión, explícita y auditable.
 
+**La decisión que define la fase, tomada el 2026-08-26: el modelo clasifica, el
+código ejecuta.** G5.2 pide que ATLAS «no pueda» saltarse la verificación. Si ATLAS
+fuera un modelo decidiendo libremente la secuencia, eso no se podría *cumplir*: sólo
+*pedir*. Y ese mismo día se midió dos veces que pedir no basta —PROBE resumió
+teniendo la orden literal de no resumir, y REVIEW aprobó con la medición que lo
+rechazaba delante—. Así que la secuencia es un **dato declarado y validado al
+cargar**; lo que decide el modelo es de qué **clase** es la tarea, que es un juicio.
+Si se equivoca de clase, el peor resultado es recorrer la ruta que no tocaba —y
+ninguna ruta publica—, nunca un resultado sin verificar.
+
 **Gate.**
 - [ ] **G5.1** ATLAS elige bien la ruta en tres tipos de tarea distintos
       (implementar / diagnosticar / revisar).
-- [ ] **G5.2** ATLAS no puede saltarse la verificación de la Fase 3.
+- [x] **G5.2** ATLAS no puede saltarse la verificación de la Fase 3.
+      **Cerrado el 2026-08-26 como propiedad de la forma, no como comportamiento
+      observado:** toda etapa que escribe —y quién escribe se deriva de
+      `agents/*/agent.json`, no de una lista aparte— tiene que ir seguida del
+      verificador antes del alto, o la ruta se rechaza al importar el módulo. Se
+      comprueba entero y siempre, sin gastar una corrida.
 - [ ] **G5.3** Un fallo en cualquier etapa detiene el ciclo; nunca lo "arregla" siguiendo adelante.
-- [ ] **G5.4** Hay un tope duro de iteraciones y un punto de corte hacia la persona.
-- [ ] **G5.5** Cada decisión de ruta queda registrada con su porqué.
+- [x] **G5.4** Hay un tope duro de iteraciones y un punto de corte hacia la persona.
+      `MAX_VUELTAS = 2`, y agotarlas se explica como decisión y no como avería.
+- [x] **G5.5** Cada decisión de ruta queda registrada con su porqué.
+      El renglón lleva **quién** decidió (modelo o regla), **por qué** esa ruta es
+      así y **qué se descartó**: sin las alternativas, una decisión siempre parece
+      la única posible.
 
 **Auditoría.** `docs/audits/fase-5.md`
 
