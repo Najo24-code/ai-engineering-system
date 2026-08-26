@@ -1,7 +1,7 @@
 # Auditoría — Fase 6: portabilidad
 
-**Fecha.** 2026-08-25 · **Estado: ABIERTA** — G6.1, G6.2 y G6.5 cerrados; G6.3 y
-G6.4 sin empezar.
+**Fecha.** 2026-08-25, ampliada el 2026-08-26 · **Estado: ABIERTA** — G6.1, G6.2,
+G6.3 y G6.5 cerrados; falta G6.4.
 
 **Objetivo de la fase.** Que el sistema deje de vivir dentro de OpenCode. Dicho por
 quien lo usa: *que sea mi flujo de trabajo en cualquier IDE y con cualquier IA*. La
@@ -93,7 +93,75 @@ OpenCode: el runtime no lo dice, se deduce, y la deducción se escribe. Mientras
 contenido por su `tools` (capa A) y por el alcance de `build` (capa B), no por el
 suyo propio.
 
+## G6.3 — el trabajo entra solo y sale solo
+
+**Cerrado el 2026-08-26.** El issue `Najo24-code/yunque#1` entró por
+`recon-build.mjs --issue 1`, recorrió el ciclo entero —incluida **una vuelta de
+rechazo que no se provocó**— y salió como
+[`yunque#2`](https://github.com/Najo24-code/yunque/pull/2), +209/−0, cerrando #1.
+
+### Las dos puntas son código, no agentes
+
+Ninguna de las dos la ejecuta un modelo, y es deliberado. **Ningún agente abre un
+PR**, porque publicar exige comprobar cosas que quien hizo el trabajo no puede
+comprobar sobre sí mismo. La prohibición de tocar git del contrato de BUILD deja
+de ser desconfianza decorativa el día que existe algo que sí publica.
+
+`publicar.mjs` se niega en cuatro casos: sin dictamen, con dictamen descartado,
+con medición RECHAZADO por encima de un APPROVED del revisor, y —la que no se ve
+venir— **cuando el árbol ya no es el que se verificó**. Entre medir y publicar
+pasa tiempo. Se sella el CONTENIDO de cada archivo tocado (sha256, `huella.json`)
+y no el diff, porque `git diff` no ve los archivos sin añadir y un test nuevo es
+lo más normal que puede dejar BUILD.
+
+### El issue es la primera entrada que el sistema no controla
+
+Hasta aquí la tarea la escribía quien disparaba el ciclo. Un issue lo escribe otro,
+y viaja al prompt de un agente que puede escribir y ejecutar. La defensa no está en
+el marco que le pone `issue.mjs` —está en que el gate mira la ruta en cada llamada
+y el verificador mide sin preguntarle a nadie—, pero el marco cuesta cero: el
+cuerpo va delimitado y etiquetado como reporte de una persona, nunca como
+instrucción del sistema.
+
+### Lo que destapó apuntarlo a un issue de verdad
+
+Cuatro defectos. **Ninguno en la tarea; los cuatro en el sistema**, y los cuatro de
+la misma familia: piezas correctas que mienten en la costura que las une.
+
+| # | defecto | qué producía |
+|---|---|---|
+| 1 | el verificador medía el alcance del **contrato** (`src/**`) mientras el policy gate aplicaba el **instalado** (`server/**`) | RECHAZADO sobre trabajo impecable, con un motivo tan creíble que se cree |
+| 2 | `\b401\b` cazando la cita `detectores.py:394-401` | un dictamen completo tirado como «credencial rechazada», y clasificado TERMINAL: sin reintento |
+| 3 | el auditor de citas exigía la ruta completa | cuatro citas resolubles a ojo declaradas inventadas, y el dictamen descartado entero |
+| 4 | **el test sombreado** | un test muerto en silencio con la suite en verde y subiendo → cerró **G3.7** |
+
+Los tres primeros son **rojos falsos**, que en este proyecto son peores que los
+verdes falsos: un control que se equivoca con un motivo plausible se aprende a
+ignorar, y un control ignorado es peor que no tenerlo.
+
+El cuarto es el hallazgo de la corrida y está contado entero en `sombra.mjs` y en
+el roadmap. Lo que importa aquí: **lo cazó una resta que nadie estaba haciendo**
+—58 tests había, 9 se añadieron, 66 midió—, y ahora la hace el verificador.
+
+### El juicio malo que la arquitectura absorbió
+
+Con la sombra ya medida y puesta delante, REVIEW la leyó, la describió bien
+—«el test de restart_storm no se ejecuta; la suite pasa pero con cobertura
+reducida»— la graduó **MENOR** y dictaminó **APPROVED**.
+
+El trabajo volvió a BUILD igualmente, porque la medición manda sobre el revisor.
+Eso es exactamente lo que la Fase 3 existe para que ocurra: el sistema no depende
+de que un agente juzgue bien. Se corrigió además el prompt de REVIEW —una medición
+RECHAZADA no admite un veredicto APROBADO— pero la corrección es de segunda línea:
+la primera ya había aguantado.
+
+### Límite conocido de la evidencia del PR
+
+`runs/` no se versiona: dentro hay transcripts completos, que pueden llevar
+credenciales. Así que el PR lleva **la medición** —los seis controles, sus detalles
+y el número de pruebas— y el nombre de la corrida, no el transcript. Es lo que se
+puede publicar sin publicar lo que no debe salir.
+
 ## Lo que falta
 
-- **G6.3**: un issue real recorre el ciclo y termina en un PR con su evidencia.
 - **G6.4**: instalación limpia en otra máquina siguiendo el README.

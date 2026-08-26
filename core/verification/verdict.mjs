@@ -54,6 +54,7 @@ import { perfil } from "../sandbox/profile.mjs"
 import { argv } from "../sandbox/bwrap.mjs"
 import { leerResultado, FORMATOS } from "./resultados.mjs"
 import { regresionDeSuite, esArchivoDeTest, testDeLinea } from "./regresion.mjs"
+import { testsSombreados, explicarSombras } from "./sombra.mjs"
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const RAIZ = join(AQUI, "..", "..")
@@ -256,15 +257,46 @@ function controlSecretos({ proyecto, base }) {
  * está equivocado: está inventado. Es la alucinación más difícil de ver leyendo,
  * porque tiene exactamente la forma de un dato duro.
  */
+/**
+ * Una cita abreviada no es una cita inventada.
+ *
+ * REVIEW cita `detectores.py:50` cuando el archivo es `server/detectores.py`.
+ * Abreviar así es lo que hace cualquiera que lleve un rato dentro del mismo
+ * repositorio, y el 2026-08-26 costó un dictamen entero: cuatro citas
+ * perfectamente resolubles a ojo salieron como «el archivo no existe» y el
+ * dictamen se descartó, con un motivo que además suena a acusación.
+ *
+ * Se resuelve por sufijo contra los archivos versionados, y **solo si encaja con
+ * uno**. Con dos o más, la cita sigue rota: ahí la ambigüedad es de verdad, y
+ * elegir una sería el control inventándose el dato que vino a comprobar.
+ */
+function candidatosPorSufijo(proyecto, ruta) {
+  let versionados
+  try {
+    versionados = git(proyecto, ["ls-files"]).split("\n")
+  } catch {
+    return [] // no es un repositorio: no hay contra qué resolver
+  }
+  const cola = `/${ruta.replace(/^\.\//, "")}`
+  return versionados.map((f) => f.trim()).filter((f) => f && f.endsWith(cola))
+}
+
 export function citasRotas(proyecto, texto) {
   const rotas = []
   for (const m of String(texto ?? "").matchAll(/\b([\w./-]+\.\w{1,5}):(\d+)\b/g)) {
     const [cita, ruta, linea] = [m[0], m[1], Number(m[2])]
     const rel = normalizarRuta(proyecto, ruta)
-    const abs = rel === null ? null : join(proyecto, rel)
+    let abs = rel === null ? null : join(proyecto, rel)
     if (!abs || !existsSync(abs)) {
-      rotas.push({ cita, motivo: "el archivo no existe" })
-      continue
+      const encajan = candidatosPorSufijo(proyecto, ruta)
+      if (encajan.length !== 1) {
+        rotas.push({
+          cita,
+          motivo: encajan.length ? `hay ${encajan.length} archivos que encajan: ${encajan.join(", ")}` : "el archivo no existe",
+        })
+        continue
+      }
+      abs = join(proyecto, encajan[0])
     }
     // Un archivo que termina en salto de línea NO tiene una línea vacía de más:
     // `"a\nb\nc\n".split("\n")` devuelve cuatro trozos y el último no es una
@@ -341,6 +373,43 @@ function controlRegresion({ proyecto, base, declarados }) {
   )
 }
 
+// ── G3.7 · el test que muere sin que nadie lo borre ─────────────────────────
+
+/**
+ * El control de regresión mira lo que SALE del diff. Este mira lo que entra y
+ * choca con lo que ya estaba.
+ *
+ * Los dos cubren el mismo daño —una suite verde que cubre menos— por caminos
+ * opuestos, y por eso hacen falta los dos. El porqué medido está en `sombra.mjs`.
+ */
+function controlSombra({ proyecto, base }) {
+  const diff = git(proyecto, ["diff", "--relative", base])
+
+  // El contenido FINAL, que es donde se ve la colisión: el diff enseña las
+  // líneas que entran, no con quién se encuentran al llegar.
+  const contenidos = {}
+  for (const ruta of archivosDelDiff(proyecto, base)) {
+    if (!esArchivoDeTest(ruta)) continue
+    try {
+      contenidos[ruta] = readFileSync(join(proyecto, ruta), "utf8")
+    } catch {
+      // Ilegible: no hay nada que comprobar aquí. Lo dice el control de alcance.
+    }
+  }
+
+  const sombras = testsSombreados({ diff, contenidos })
+  return sombras.length
+    ? hallazgo(
+        "sombra",
+        false,
+        null,
+        sombras,
+        `${explicarSombras(sombras)}. Un nombre repetido no borra nada del diff: mata la definición anterior ` +
+          `al importar, y la suite sigue verde con un test menos.`,
+      )
+    : hallazgo("sombra", true, null, [])
+}
+
 // ── el veredicto ────────────────────────────────────────────────────────────
 
 /**
@@ -356,6 +425,7 @@ export function veredicto({ proyecto, base = "HEAD", alcance = [], informe = {},
     controlSuite({ proyecto, afirmado: informe.tests ?? null, comando, red }),
     controlRegresion({ proyecto, base, declarados: informe.tests_retirados ?? null }),
     controlAlcance({ proyecto, base, alcance, afirmado: informe.archivos ?? null }),
+    controlSombra({ proyecto, base }),
     controlSecretos({ proyecto, base }),
     controlCitas({ proyecto, texto: informe.texto }),
   ].filter(Boolean)

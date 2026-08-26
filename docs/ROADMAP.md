@@ -122,6 +122,10 @@ y produce un veredicto con evidencia.
       "214 tests pasaron" sobre un árbol donde los tests fallan. El verificador
       tiene que rechazarlo. Sin esta prueba la fase no cierra.
 - [x] **G3.5** El veredicto se guarda con su evidencia y es reproducible.
+- [x] **G3.7** **Prueba del test sombreado** *(añadido el 2026-08-26, ver abajo)*.
+      Un cambio que añade un test con el nombre de otro que ya existe en el mismo
+      ámbito tiene que salir RECHAZADO, y los nombres que se repiten sin pisarse
+      —dos clases distintas, dos `test()` de JS— tienen que seguir saliendo APROBADO.
 - [x] **G3.6** **Prueba de la suite que adelgaza** *(añadido el 2026-08-25, ver abajo)*.
       Un cambio que rompe una función y borra los tests que la cubrían tiene que
       salir RECHAZADO, y el trabajo legítimo —incluida la retirada declarada— tiene
@@ -142,6 +146,30 @@ trabajo correcto, y un control que lo prohíba produce rojos falsos sobre trabaj
 impecable—; lo que no puede es ocurrir en silencio. Los cuatro casos discriminan:
 retirada callada → RECHAZADO nombrando los tests; trabajo legítimo → APROBADO;
 retirada declarada → APROBADO; declarar dos de tres → RECHAZADO por el tercero.
+
+**G3.7 tampoco estaba en el plan: lo trajo una corrida real de la Fase 6.** G3.6
+caza al que *encoge* la suite borrando tests. Ninguno cazaba al que la encoge
+**sin borrar nada**: BUILD añadió nueve pruebas y una se llamaba igual que otra
+que ya existía en ese archivo, para otro detector. Python se queda con la última
+definición, así que la original murió al importar el módulo — 49 `def test_` en
+el archivo, 48 recogidos por pytest.
+
+Lo grave es la lista de lo que NO lo delató: la suite pasó con 66 en verde y 0 en
+rojo (el número **subió**), el control de regresión no vio nada porque no se borró
+ni se silenció nada, alcance y secretos y citas conformes, y REVIEW lo leyó entero
+y dictaminó APPROVED. Nadie mintió en ningún sitio. Lo único que lo delataba era
+una resta: había 58, se añadieron 9, midió 66.
+
+Lo cierra `core/verification/sombra.mjs`. Solo cuentan las formas en que un test
+se **define** —`def test_x`, `func TestX`—, no las llamadas tipo `test("x", …)`,
+donde dos nombres iguales corren los dos y avisar sería un rojo falso. Y solo se
+mira el ámbito real: dos métodos con el mismo nombre en clases distintas no se
+pisan. Una colisión que ya estaba antes del cambio no se le cuelga al cambio.
+
+Queda escrito lo que este control **no** hace: la comprobación general —que la
+suite crezca exactamente lo que crecieron sus definiciones— necesita medir también
+el árbol base, y eso es otra corrida de la suite sobre un árbol limpio que hoy no
+hay de dónde sacar sin tocar el del usuario.
 
 La fase entregó además una capa que el gate no pedía y que resultó ser su
 cimiento: **el recinto** (`core/sandbox/`, bubblewrap). Sin ella, el verificador
@@ -210,14 +238,20 @@ ciclo de tres tiene que ser aburrido de tan confiable.
 
 **Entregable.** Un segundo adaptador de runtime y la entrada desde un issue.
 
-**Gate.** **ABIERTA** — 3 cerrados el 2026-08-25, 2 sin empezar.
+**Gate.** **ABIERTA** — 4 cerrados; falta G6.4.
 - [x] **G6.1** El mismo contrato de agente corre en dos runtimes distintos.
       Segundo adaptador: `runtimes/claude-code/`, contra Claude Code 2.1.246.
       Los cuatro contratos se instalan y corren.
 - [x] **G6.2** Cambiar de runtime **no** exige tocar `agents/`.
       Verificado contra el árbol: lo único añadido es `runtimes/claude-code/`;
       ni un archivo bajo `agents/` cambió.
-- [ ] **G6.3** Un issue real recorre el ciclo y termina en un PR con su evidencia.
+- [x] **G6.3** Un issue real recorre el ciclo y termina en un PR con su evidencia.
+      **CERRADO el 2026-08-26.** `Najo24-code/yunque#1` entró por `--issue`, recorrió
+      RECON → BUILD → verificador → REVIEW → **rechazo** → BUILD → verificador →
+      REVIEW, y salió por `publicar.mjs` como
+      [`yunque#2`](https://github.com/Najo24-code/yunque/pull/2) (+209/−0, cierra #1),
+      con la medición en el cuerpo del PR: 6 controles y 67 pruebas en verde.
+      La vuelta de rechazo **no se provocó**: la pidió un defecto real.
 - [ ] **G6.4** El sistema se instala limpio en una máquina distinta siguiendo el README.
 - [x] **G6.5** Las fronteras de las fases 1 y 2 siguen siendo reales en el runtime nuevo.
       **No se heredaron: se volvieron a correr.** En una sesión real de Claude Code,

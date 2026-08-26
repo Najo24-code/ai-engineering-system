@@ -66,6 +66,7 @@ export function esArchivoDeTest(ruta) {
   if (/(^|\/)(tests?|spec|__tests__)\//.test(p)) return true
   if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(p)) return true
   if (/(^|\/)test_[^/]*\.py$/.test(p) || /_test\.py$/.test(p)) return true
+  if (/_test\.go$/.test(p)) return true
   return false
 }
 

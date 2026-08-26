@@ -48,9 +48,14 @@ runtime sea otro, se reescribe un adaptador, no los agentes.
 ## El ciclo
 
 ```
-RECON  →  BUILD  →  [verificador]  →  REVIEW  →  (rechazo) → BUILD
-entiende  implementa   MIDE            JUZGA
+ISSUE →  RECON  →  BUILD  →  [verificador]  →  REVIEW  →  (rechazo) → BUILD
+         entiende  implementa   MIDE            JUZGA          ↓
+                                                          [publicar] → PR
 ```
+
+Entra por un issue de GitHub y sale por un pull request. Las dos puntas son
+código determinista, no agentes: **ningún agente abre un PR**, porque publicar
+exige comprobar cosas que quien hizo el trabajo no puede comprobar sobre sí mismo.
 
 Entre etapa y etapa aprieta el botón una persona. El orquestador es de la Fase 5;
 hasta que el ciclo sea aburrido de tan confiable, automatizar el disparo solo
@@ -59,7 +64,7 @@ sirve para equivocarse más rápido.
 | Agente | Puede | No puede |
 |---|---|---|
 | **RECON** | leer | escribir, ejecutar, delegar |
-| **BUILD** | escribir en `src/**` y `tests/**`, correr la verificación | salir de su alcance, tocar secretos o CI, instalar, hacer commit |
+| **BUILD** | escribir donde diga la instalación del proyecto, correr la verificación | salir de su alcance, tocar secretos o CI, instalar, hacer commit |
 | **REVIEW** | leer | **modificar nada**, **ejecutar nada** — ni siquiera los tests |
 
 Que REVIEW no corra los tests es deliberado: si los corriera y reportara el
@@ -92,9 +97,14 @@ en el entorno.
 
 ```bash
 # 1. instalar el sistema en el proyecto (crea su .opencode/)
-node runtimes/opencode/sync.mjs --en /ruta/a/tu-proyecto
+#    --alcance y --comandos NO son opcionales fuera de un proyecto Node con src/:
+#    donde vive el código y cómo se corren las pruebas son propiedades del
+#    PROYECTO, no del rol del agente. Sin ellos el gate niega toda escritura.
+node runtimes/opencode/sync.mjs --en /ruta/a/tu-proyecto \
+  --alcance "server/**" --comandos "venv/bin/python -m pytest server/ -q"
 
-# 2. RECON entiende y BUILD implementa
+# 2. RECON entiende y BUILD implementa — desde un issue, o desde una frase
+node core/flow/recon-build.mjs --target /ruta/a/tu-proyecto --issue 12
 node core/flow/recon-build.mjs --target /ruta/a/tu-proyecto \
   --task "lo que hay que hacer, en una frase"
 
@@ -104,7 +114,17 @@ node core/flow/review.mjs --run runs/<fecha>
 # 4. si REVIEW rechaza, el trabajo vuelve a BUILD
 node core/flow/rework.mjs --run runs/<fecha>
 node core/flow/review.mjs --run runs/<fecha>/vuelta-2
+
+# 5. si todo salió en verde, se publica. Sin --confirmar solo dice qué haría.
+node core/flow/publicar.mjs --run runs/<fecha>
+node core/flow/publicar.mjs --run runs/<fecha> --confirmar
 ```
+
+El paso 5 se niega a publicar si no hay dictamen, si el dictamen quedó
+descartado, si el verificador midió RECHAZADO, o si **el árbol ya no es el que se
+verificó** — se sella el contenido de cada archivo tocado al medir y se vuelve a
+comprobar al publicar. Entre medir y publicar pasa tiempo, y un PR con el sello
+de una verificación hecha sobre otro contenido es peor que un PR sin sello.
 
 Cada corrida deja `runs/<fecha>/` con lo que RECON entendió, lo que BUILD dice
 que hizo, **lo que hizo de verdad** (`cambios.diff`), lo que la política le negó,
@@ -122,7 +142,7 @@ absoluta. Si mueves el sistema de sitio, vuelve a correr el paso 1.
 ## Comprobar que las fronteras siguen siendo reales
 
 ```bash
-npm test                  # 46 tests, ~1 s, CERO llamadas al proveedor
+npm test                  # 191 tests, ~1 s, CERO llamadas al proveedor
 npm run gate:contencion   # el recinto: 13 ataques deterministas, cuesta cero
 npm run sync:check        # ¿los agentes instalados coinciden con sus contratos?
 ```

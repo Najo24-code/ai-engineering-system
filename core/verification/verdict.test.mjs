@@ -63,6 +63,27 @@ function arbol({ tests = {}, cambios = {} } = {}) {
   return dir
 }
 
+/**
+ * Un repositorio con los archivos que se le den, todos versionados.
+ *
+ * Versionados a propósito: la resolución de citas abreviadas pregunta por
+ * `git ls-files`, así que un archivo suelto en el disco no serviría de fixture.
+ */
+function repoDePrueba(archivos) {
+  const dir = mkdtempSync(join(tmpdir(), "citas-"))
+  const g = (...a) => execFileSync("git", ["-C", dir, ...a], { stdio: "pipe" })
+  g("init", "-q")
+  g("config", "user.email", "fixture@local")
+  g("config", "user.name", "fixture")
+  for (const [ruta, contenido] of Object.entries(archivos)) {
+    mkdirSync(join(dir, ruta.split("/").slice(0, -1).join("/") || "."), { recursive: true })
+    writeFileSync(join(dir, ruta), contenido)
+  }
+  g("add", "-A")
+  g("commit", "-q", "-m", "base")
+  return dir
+}
+
 const limpiar = (d) => rmSync(d, { recursive: true, force: true })
 const ALCANCE = ["src/**", "tests/**", "package.json"]
 
@@ -235,4 +256,39 @@ test("citas: una línea que no existe es una alucinación con forma de dato", ()
   } finally {
     limpiar(dir)
   }
+})
+
+// ── citas abreviadas: resolver sin perder los dientes ──────────────────────
+
+test("una cita abreviada que encaja con UN solo archivo se resuelve", () => {
+  // El caso real del 2026-08-26: REVIEW citó `detectores.py:50` estando el
+  // archivo en `server/detectores.py`, y el dictamen entero se descartó.
+  const proyecto = repoDePrueba({
+    "server/detectores.py": Array.from({ length: 80 }, (_, i) => `linea ${i + 1}`).join("\n"),
+  })
+  assert.deepEqual(citasRotas(proyecto, "mira `detectores.py:50`"), [])
+})
+
+test("una cita abreviada ambigua sigue siendo cita rota", () => {
+  // Con dos candidatos, elegir uno sería el control inventándose el dato que
+  // vino a comprobar.
+  const proyecto = repoDePrueba({
+    "a/util.py": "una linea\n",
+    "b/util.py": "una linea\n",
+  })
+  const rotas = citasRotas(proyecto, "ver `util.py:1`")
+  assert.equal(rotas.length, 1)
+  assert.match(rotas[0].motivo, /2 archivos que encajan/)
+})
+
+test("un archivo inventado sigue saliendo roto aunque se abrevie", () => {
+  const proyecto = repoDePrueba({ "server/real.py": "x\n" })
+  assert.equal(citasRotas(proyecto, "ver `inventado.py:9`").length, 1)
+})
+
+test("la línea se comprueba contra el archivo resuelto, no contra su nombre", () => {
+  const proyecto = repoDePrueba({ "server/corto.py": "una\ndos\n" })
+  const rotas = citasRotas(proyecto, "ver `corto.py:99`")
+  assert.equal(rotas.length, 1)
+  assert.match(rotas[0].motivo, /tiene 2 líneas/)
 })

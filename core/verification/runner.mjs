@@ -52,14 +52,43 @@ export const FALLO = { TRANSITORIO: "transitorio", TERMINAL: "terminal" }
  *
  * @returns {{motivo: string, clase: string}|null}
  */
+/**
+ * Si el informe del primario está COMPLETO, la corrida llegó al modelo.
+ *
+ * El contrato de `probe` obliga a cerrar con la sección `Resultado`, y ese
+ * cierre solo lo puede escribir un agente que corrió. Es evidencia positiva, y
+ * por eso gana a cualquier frase que aparezca dentro del informe.
+ *
+ * Sin esto, el clasificador no distingue la voz del RUNTIME de la prosa del
+ * AGENTE, porque las dos llegan por el mismo canal y en el mismo texto. El
+ * 2026-08-26 eso tiró un dictamen entero de REVIEW: en su tabla de evidencia
+ * había una cita de líneas, `detectores.py:394-401`, y `\b401\b` la leyó como
+ * una credencial rechazada. Clasificado TERMINAL, que además aborta sin
+ * reintentar. El único agente cuyo trabajo ES citar archivo:línea era el que no
+ * podía citar un rango acabado en 401.
+ */
+export function informeCompleto(salida) {
+  return /^##\s*Resultado\s*$/m.test(salida) && /EL AGENTE DIJO QUE (LO HIZO|NO PUDO)/.test(salida)
+}
+
 export function clasificarFallo(salida) {
+  // Lo primero de todo: si hay informe completo, hubo corrida. Lo que venga
+  // después son frases DENTRO del trabajo del agente, no errores del proveedor.
+  if (informeCompleto(salida)) return null
+
   // Lo terminal se mira PRIMERO: el runtime envuelve el 429 del proveedor en su
   // propio `AI_APICallError`, así que la rama genérica de "abortó con un Error"
   // lo atraparía antes y lo llamaría transitorio. El orden es el que decide.
   if (/free-models-per-day|rate.?limit|requires more credits|insufficient credits|quota/i.test(salida)) {
     return { motivo: "el proveedor rechazó la petición: no queda cuota", clase: FALLO.TERMINAL }
   }
-  if (/invalid api key|unauthorized|\b401\b/i.test(salida)) {
+  // El 401 se exige con forma de HTTP. Un número suelto no es un estado: en una
+  // salida a medias, `foo.py:394-401` o `line 401` volverían a disparar esto.
+  // Riesgo que queda escrito en vez de escondido: "rate limit" y "quota" siguen
+  // siendo palabras que un agente puede escribir sobre el código que revisa. En
+  // una corrida COMPLETA ya no importan —manda `informeCompleto`—; en una a
+  // medias, sí. Se arreglará cuando haya un caso medido, no antes.
+  if (/invalid api key|401\s+unauthorized|\bunauthorized\b|status(?:_?code)?"?\s*[:=]\s*401\b|HTTP\/?[\d.]*\s*401\b/i.test(salida)) {
     return { motivo: "el proveedor rechazó la credencial", clase: FALLO.TERMINAL }
   }
   // Ausente NO es rechazada, y hasta el 2026-08-25 solo estaba contemplada la

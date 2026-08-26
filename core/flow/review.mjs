@@ -35,6 +35,9 @@ import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
 import { veredicto } from "../verification/verdict.mjs"
 import { testsRetiradosDeclarados } from "../verification/regresion.mjs"
 import { leerDictamen, citasRotasEnAmbasRaices } from "./dictamen.mjs"
+import { alcanceEfectivo, comandoDePruebas } from "../policies/instalado.mjs"
+import { archivosDelDiff } from "../verification/verdict.mjs"
+import { huellaDeArchivos } from "../verification/huella.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -86,9 +89,33 @@ if (!diff.trim()) {
 
 // ── 1. lo que se puede medir, se mide ───────────────────────────────────────
 
-/** El alcance sale del contrato de BUILD. Una segunda copia se desincronizaría. */
+/**
+ * El alcance se mide contra el que SE APLICÓ, no contra el que declara el
+ * contrato.
+ *
+ * Los dos coinciden en `lab/` y en cualquier proyecto Node con `src/`. En
+ * cualquier otro no, porque el instalador ata la intención del contrato a las
+ * rutas del proyecto —`--alcance "server/**"` en uno Python— y el policy gate
+ * aplica eso. Medir contra el contrato mientras el gate aplica otra cosa produce
+ * un RECHAZADO por «fuera del alcance» sobre trabajo que el gate autorizó, con
+ * un motivo tan creíble que se cree. El porqué largo está en `instalado.mjs`.
+ */
 const contratoBuild = JSON.parse(readFileSync(join(ROOT, "agents", "build", "agent.json"), "utf8"))
-const alcance = contratoBuild.scope.write
+const aplicado = alcanceEfectivo({ proyecto: CWD, contrato: contratoBuild, agente: "build" })
+const alcance = aplicado.write
+for (const aviso of aplicado.avisos) console.log(`⚠️  ${aviso}`)
+
+/**
+ * Y el comando de la suite sale del mismo sitio, por el mismo motivo: cómo se
+ * corren las pruebas es una propiedad del proyecto, y ya está escrita en la
+ * instalación. Sin esto hay que acordarse de repetirla a mano en cada etapa, y
+ * el día que se olvide, el verificador corre `npm test` en un proyecto Python,
+ * no encuentra suite y produce otro rojo con motivo plausible.
+ */
+const comandoSuite = leer("--comando")?.split(" ").filter(Boolean) ?? comandoDePruebas(aplicado.shell) ?? undefined
+
+console.log(`Alcance: ${alcance.join(", ") || "vacío"}  ·  ${aplicado.fuente}`)
+if (comandoSuite) console.log(`Suite  : ${comandoSuite.join(" ")}`)
 
 process.stdout.write("MEDIR  el verificador, antes de opinar . ")
 const medido = veredicto({
@@ -101,9 +128,21 @@ const medido = veredicto({
     // rechazaría también las retiradas que BUILD sí escribió en su informe.
     tests_retirados: testsRetiradosDeclarados(reporteBuild ?? ""),
   },
-  comando: leer("--comando")?.split(" ").filter(Boolean),
+  comando: comandoSuite,
 })
 guardar("veredicto.json", JSON.stringify(medido, null, 2))
+
+/**
+ * El sello del árbol que se acaba de medir.
+ *
+ * Publicar ocurre después, a veces bastante después, y en medio el árbol puede
+ * moverse: otra vuelta de BUILD, una prueba a mano que se quedó puesta, una
+ * edición. Sin este sello, el PR saldría con la firma de una verificación hecha
+ * sobre otro contenido, y esa firma es todo lo que tiene quien lo revisa.
+ * Se sella el CONTENIDO y no el diff porque `git diff` no ve los archivos sin
+ * seguir, y un test nuevo es lo más normal que puede dejar BUILD.
+ */
+guardar("huella.json", JSON.stringify(huellaDeArchivos(CWD, archivosDelDiff(CWD, medido.base)), null, 2))
 console.log(medido.resultado)
 for (const c of medido.controles) console.log(`       ${c.aprueba ? "✅" : "🔴"} ${c.control.padEnd(9)} ${c.detalle ?? "conforme"}`)
 
@@ -123,6 +162,12 @@ const mensaje =
   `=== MEASURED VERDICT FROM THE INDEPENDENT VERIFIER (${medido.resultado}) ===\n${resumenMedido}\n` +
   `=== END MEASURED VERDICT ===\n\n` +
   `This verdict was measured, not claimed. Do not re-check it and do not contradict it. ` +
+  (medido.resultado === "RECHAZADO"
+    ? `The measurement outranks your judgment: since it says RECHAZADO, your verdict CANNOT be APPROVED, ` +
+      `and every problem it names is a BLOCKING defect. You may add defects it did not find; you may not downgrade its. ` +
+      `On 2026-08-26 a reviewer read "a test is silently shadowed and no longer runs", wrote it down correctly, ` +
+      `graded it MENOR and approved. A test that stopped running is never minor.\n\n`
+    : "") +
   `Your job starts where the measurement ends: correctness, task fit, broken contracts, ` +
   `and tests that would pass with the bug still in. Open the files the diff touches; the diff ` +
   `shows the changed lines, not the context that breaks them. Produce your complete dictamen.`
@@ -189,4 +234,6 @@ if (medido.resultado === "RECHAZADO" || veredictoRevisor === "REJECTED") {
   console.log(`  node core/flow/rework.mjs --run ${corrida}`)
   process.exit(1)
 }
-console.log("\nCiclo en verde. Lo que se publica lo decide una persona.")
+console.log("\nCiclo en verde. Lo que se publica lo decide una persona:")
+console.log(`  node core/flow/publicar.mjs --run ${corrida}`)
+console.log("  (sin --confirmar solo dice qué haría; nada sale de la máquina)")

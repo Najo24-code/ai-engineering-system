@@ -3,6 +3,7 @@
  * El primer tramo del ciclo: RECON entiende, BUILD implementa.
  *
  *   node core/flow/recon-build.mjs --task "lo que hay que hacer" [--target lab]
+ *   node core/flow/recon-build.mjs --issue 12 --target /ruta/al/proyecto
  *
  * Lo dispara una persona, a propósito. No hay orquestador todavía y no lo va a
  * haber hasta la Fase 5: mientras el ciclo no sea aburrido de tan confiable,
@@ -23,6 +24,7 @@ import { execFileSync } from "node:child_process"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
+import { parsearReferencia, motivosParaNoEntrar, componerTarea, traerIssue } from "./issue.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -33,12 +35,13 @@ const leer = (bandera) => {
   return i === -1 ? null : args[i + 1]
 }
 
-const task = leer("--task")
 const target = leer("--target") ?? "lab"
 const soloBuild = args.includes("--skip-recon")
+const refIssue = leer("--issue")
 
-if (!task) {
+if (!leer("--task") && !refIssue) {
   console.error('uso: recon-build.mjs --task "lo que hay que hacer" [--target lab] [--skip-recon]')
+  console.error("     recon-build.mjs --issue <número|url|owner/repo#n> [--repo owner/repo] [--target <ruta>]")
   process.exit(2)
 }
 
@@ -78,6 +81,46 @@ const guardar = (nombre, contenido) => {
 const gitDiff = () =>
   execFileSync("git", ["-C", CWD, "diff", "--relative"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 })
 
+// ── de dónde sale la tarea ─────────────────────────────────────────────────
+
+/**
+ * Con `--issue`, la tarea la escribe otra persona y llega de fuera. Ese es el
+ * cambio de la Fase 6: hasta aquí el trabajo entraba solo por la mano de quien
+ * disparaba el ciclo, así que el sistema nunca había digerido texto que no
+ * controlara. El marco que lo distingue de una instrucción está en `issue.mjs`.
+ *
+ * El issue se guarda crudo en la corrida. La tarea es una interpretación suya, y
+ * dentro de un año habrá que poder ver cuál fue el original.
+ */
+let task = leer("--task")
+
+if (refIssue) {
+  const ref = parsearReferencia(refIssue)
+  if (ref.error) {
+    console.error(ref.error)
+    process.exit(2)
+  }
+
+  process.stdout.write(`ISSUE  trayendo #${ref.numero} ................ `)
+  const issue = traerIssue({ repo: leer("--repo") ?? ref.repo, numero: ref.numero, cwd: CWD })
+  if (issue.error) {
+    console.log("NO SE PUDO")
+    console.error(issue.error)
+    process.exit(2)
+  }
+
+  const noEntra = motivosParaNoEntrar(issue)
+  if (noEntra.length) {
+    console.log("NO ENTRA")
+    for (const m of noEntra) console.error(`   · ${m}`)
+    process.exit(3)
+  }
+
+  console.log(`"${issue.title}"`)
+  guardar("issue.json", JSON.stringify(issue, null, 2))
+  task = componerTarea(issue)
+}
+
 // La corrida tiene que poder leerse sola. Sin la tarea guardada, la etapa de
 // REVIEW no sabe contra qué juzgar el diff, y "lo que se pidió" acaba siendo lo
 // que alguien recuerde haber pedido.
@@ -86,7 +129,9 @@ guardar("objetivo.txt", `${target}\n`)
 
 console.log(`Corrida: runs/${sello}`)
 console.log(`Objetivo: ${target}`)
-console.log(`Tarea: ${task}\n`)
+// La tarea de un issue trae su marco y su cuerpo entero. En pantalla se resume;
+// completa está en tarea.txt, que es de donde la leen las etapas siguientes.
+console.log(`Tarea: ${task.split("\n")[0]}\n`)
 
 // ── RECON ──────────────────────────────────────────────────────────────────
 
