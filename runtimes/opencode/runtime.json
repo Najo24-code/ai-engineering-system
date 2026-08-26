@@ -93,5 +93,10 @@
     "real": "El mapa 'tools: {x: false}' determina el conjunto de herramientas que se le ENTREGA al modelo. La herramienta prohibida no existe para él: no hay nada que denegar en tiempo de ejecución.",
     "weaker": "El bloque 'permission' produce reglas que se evalúan al invocar. Útil, pero solo cubre las claves de arriba y no siempre gobierna lo que su nombre sugiere.",
     "rule": "Un contrato se hace cumplir con 'tools' por default-deny. 'permission' es refuerzo, nunca la única capa."
-  }
+  },
+  "version_cmd": [
+    "{HOME}/.opencode/bin/opencode",
+    "--version"
+  ],
+  "$comment_version_cmd": "Como se le pregunta la version al runtime instalado. Existe para poder COMPARARLA con verified_version en cada instalacion: sin eso, 'verificado' significa 'lo estuvo alguna vez'. {HOME} lo sustituye el instalador."
 }

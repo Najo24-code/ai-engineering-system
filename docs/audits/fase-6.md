@@ -200,6 +200,67 @@ credenciales. Así que el PR lleva **la medición** —los seis controles, sus d
 y el número de pruebas— y el nombre de la corrida, no el transcript. Es lo que se
 puede publicar sin publicar lo que no debe salir.
 
+## G6.4 — la instalación limpia
+
+**Parcial el 2026-08-26.** Vehículo: un contenedor Debian con `node:22` y nada
+más, usuario sin privilegios. Un contenedor es «otra máquina» en lo que importa
+aquí —otro sistema de archivos, otro home, ningún rastro de la máquina donde se
+construyó el sistema— y no depende de tener hardware libre.
+
+### El README describía la máquina donde se construyó
+
+Seis huecos, todos medidos chocando contra ellos, no recordados:
+
+| hueco | qué pasaba |
+|---|---|
+| «`OPENROUTER_API_KEY` en el entorno» | **falso desde el 2026-08-25**. La credencial la deja `opencode auth login` en `~/.local/share/opencode/auth.json`. Quien siguiera el README ponía una variable que no se usa y le faltaba la que sí |
+| `git` sin declarar | el verificador compara contra `HEAD`; sin git no hay verificación |
+| `gh` sin declarar | `publicar.mjs` lo necesita para abrir el PR |
+| cómo instalar `opencode` | se declaraba como requisito sin decir de dónde sale |
+| user namespaces sin privilegios | **no estaba escrito en ninguna parte**, y sin ellos el recinto no arranca |
+| `npm test` no es hermético | **5 de sus pruebas necesitan el recinto**. Sin él fallan con mensajes que parecen defectos del verificador (226/231), y nada dice que el problema es el entorno |
+
+### El requisito del recinto, separado en sus tres partes
+
+Ninguna es `--privileged` ni `--cap-add`; cada una falla distinto y por eso se
+pueden aislar:
+
+| falta | qué error da |
+|---|---|
+| `seccomp=unconfined` | `No permissions to create new namespace` |
+| `apparmor=unconfined` | `Failed to make / slave: Permission denied` |
+| `systempaths=unconfined` | `Can't mount proc on /newroot/proc` |
+
+### El hallazgo que no venía a buscar: «verificado» sin fecha de caducidad
+
+`runtime.json` guarda los hechos medidos del runtime y su propio comentario avisa:
+*«Al subir de versión hay que volver a verificarlo Y volver a correr el banco:
+este archivo caduca.»* **Nadie comprobaba la caducidad**, y los dos instaladores
+imprimían `verified_version` al terminar con una frase —«4 agentes sincronizados
+con opencode 1.18.18»— que se lee como si alguien hubiera mirado la instalación.
+
+No la miraba nadie. Y al medirla salió que **la máquina donde se construyó el
+sistema también tiene 1.18.23**: los hechos del runtime llevaban cinco versiones
+sin revalidar, en silencio, mientras el instalador imprimía un número que parecía
+medido y era una constante copiada de un archivo.
+
+Lo cierra `runtimes/version.mjs`. **Avisa, no impide** —un gate que bloquea el
+trabajo por un salto de parche se desactiva la primera semana—, y no poder medir
+la versión **no** cuenta como que coincida.
+
+### Estado, con lo que falta dicho
+
+Siguiendo el README corregido, de cero: `npm test` **237/237**,
+`gate:contencion` **11 contenidas · 4 controles positivos · 0 fugas · 0 recinto
+roto**, opencode instalado, y el sistema desplegado en un proyecto con su aviso de
+versión disparando.
+
+**Lo que NO está probado, y por eso el gate sigue abierto:** que un agente corra
+de verdad ahí. Eso exige mover una credencial al contenedor, y esa decisión no es
+del sistema. Después del hallazgo de la sustitución silenciosa de agente, este
+gate debería además exigir que los agentes queden **invocables**, no solo escritos
+en disco: el runtime puede aceptar la instalación y luego correr otro.
+
 ## Lo que falta
 
-- **G6.4**: instalación limpia en otra máquina siguiendo el README.
+- **G6.4**: la mitad viva —que un agente corra en la instalación limpia.

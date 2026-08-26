@@ -92,8 +92,41 @@ Están en `docs/ARCHITECTURE.md` con la evidencia de cada una.
 
 ## Apuntarlo a un proyecto tuyo
 
-Requisitos: `node` 22+, `bwrap` (bubblewrap), `opencode`, y `OPENROUTER_API_KEY`
-en el entorno.
+### Requisitos
+
+Medidos el 2026-08-26 montando una instalación limpia desde cero, no recordados.
+Lo que decía antes esta sección describía la máquina donde se construyó el
+sistema, que es exactamente lo que la Fase 6 existe para no dar por bueno.
+
+| qué | por qué | cómo se pone |
+|---|---|---|
+| `node` 22+ | el sistema entero | — |
+| `git` | el verificador compara el árbol contra `HEAD` | `apt install git` |
+| `bwrap` (bubblewrap) | **el recinto**, y sin él fallan 5 pruebas de la suite | `apt install bubblewrap` |
+| `opencode` | el runtime | `curl -fsSL https://opencode.ai/install \| bash` |
+| credencial del proveedor | las llamadas al modelo | `opencode auth login` |
+| `gh` autenticado | **solo** para `publicar.mjs` | `gh auth login` |
+
+⚠️ **La credencial NO va en el entorno.** Esta sección decía «`OPENROUTER_API_KEY`
+en el entorno» y era falso desde el 2026-08-25: el proveedor es OpenCode Zen y su
+credencial vive donde la deja `opencode auth login` (`~/.local/share/opencode/auth.json`).
+Quien siguiera el README ponía una variable que no se usa y le faltaba la que sí.
+
+⚠️ **El recinto exige user namespaces sin privilegios.** Es una propiedad del
+sistema donde corre, no del proyecto, y no estaba escrita en ninguna parte.
+Sin ella `bwrap` no arranca y **cinco pruebas de `npm test` fallan con mensajes
+que parecen defectos del verificador**. Dentro de un contenedor hacen falta las
+tres, medidas una por una (ninguna es `--privileged` ni `--cap-add`):
+
+```bash
+docker run --security-opt seccomp=unconfined \
+           --security-opt apparmor=unconfined \
+           --security-opt systempaths=unconfined ...
+```
+
+Cada una falla distinto y por eso se pueden separar: sin `seccomp` no se crea el
+namespace; sin `apparmor` se crea y no se puede montar; sin `systempaths` falla al
+montar `/proc`.
 
 ```bash
 # 1. instalar el sistema en el proyecto (crea su .opencode/)
@@ -142,7 +175,7 @@ absoluta. Si mueves el sistema de sitio, vuelve a correr el paso 1.
 ## Comprobar que las fronteras siguen siendo reales
 
 ```bash
-npm test                  # 191 tests, ~1 s, CERO llamadas al proveedor
+npm test                  # 237 tests, ~1 s, CERO llamadas al proveedor
 npm run gate:contencion   # el recinto: 13 ataques deterministas, cuesta cero
 npm run sync:check        # ¿los agentes instalados coinciden con sus contratos?
 ```

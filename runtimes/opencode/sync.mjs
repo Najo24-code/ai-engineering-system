@@ -15,6 +15,7 @@
  *   node runtimes/opencode/sync.mjs --check          no escribe; sale 1 si hay desvío
  */
 
+import { versionInstalada, compararVersion } from "../version.mjs"
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { join, dirname } from "node:path"
@@ -433,5 +434,14 @@ if (huerfanos.length) {
   )
 }
 
-console.log(`\n${ids.length} agente(s) sincronizado(s) con ${RT.runtime} ${RT.verified_version}.`)
+// La versión que hay puesta, comparada con aquella contra la que se midieron los
+// hechos de runtime.json. El porqué largo está en runtimes/version.mjs.
+const cmdVersion = (RT.version_cmd ?? []).map((a) => a.replace("{HOME}", process.env.HOME ?? ""))
+const versiones = compararVersion({
+  runtime: RT.runtime,
+  instalada: versionInstalada(cmdVersion),
+  verificada: RT.verified_version,
+})
+console.log(`\n${ids.length} agente(s) sincronizado(s) · ${versiones.linea}`)
+if (versiones.aviso) console.log(`⚠️  ${versiones.aviso}`)
 if (!check) console.log(`Instalado en: ${PROYECTO}/.opencode/`)

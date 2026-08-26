@@ -253,6 +253,11 @@ ciclo de tres tiene que ser aburrido de tan confiable.
       con la medición en el cuerpo del PR: 6 controles y 67 pruebas en verde.
       La vuelta de rechazo **no se provocó**: la pidió un defecto real.
 - [ ] **G6.4** El sistema se instala limpio en una máquina distinta siguiendo el README.
+      **Parcial el 2026-08-26**, en un contenedor Debian limpio: `npm test` 237/237,
+      recinto con 0 fugas, opencode instalado y el sistema desplegado. El README tenía
+      **seis huecos** —empezando por una credencial que llevaba un día sin ser la buena—
+      y de paso salió que `verified_version` no la comprobaba nadie. Falta la mitad viva:
+      que un agente corra ahí, lo que exige mover una credencial al contenedor.
 - [x] **G6.5** Las fronteras de las fases 1 y 2 siguen siendo reales en el runtime nuevo.
       **No se heredaron: se volvieron a correr.** En una sesión real de Claude Code,
       escribir fuera del alcance quedó NEGADO (`A-ALCANCE`, archivo intacto) y un
