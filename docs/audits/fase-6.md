@@ -83,6 +83,44 @@ desactivar el hook) y dejó las tres en manos de quien decide.
   traducción: código 2. Un gate que se cae abierto es peor que no tener gate, porque
   el informe seguirá diciendo que había uno.
 
+## Lo que el runtime hace cuando le pides un agente que no puede correr
+
+Medido el 2026-08-26, y es el hallazgo de portabilidad más caro hasta ahora.
+
+```
+$ opencode run --agent recon "…"
+! agent "recon" is a subagent, not a primary agent. Falling back to default agent
+> plan · qwen3.7-max
+```
+
+**No falla. Avisa, cambia de agente y de modelo, y termina con código 0.**
+
+Quien lanzara `--agent build` creería estar corriendo BUILD bajo su contrato —su
+alcance de escritura, sus comandos, sus prohibiciones— y estaría corriendo el
+agente por defecto, que **no aparece en `scopes.generated.json`** y por tanto no
+tiene alcance que aplicarle. El trabajo saldría, el informe parecería normal, y la
+única señal sería un renglón de aviso en stderr.
+
+Dos cosas se siguen de esto:
+
+- **Es la razón de que el flujo pase por `probe`**, y no un descuido de diseño: hoy
+  por hoy el runtime no ofrece otra vía para ejecutar un subagente.
+- **`clasificarFallo` lo trata como TERMINAL y lo comprueba antes que nada**, por
+  delante incluso de la evidencia positiva de un informe completo. La sustitución
+  es un hecho sobre *qué* corrió; ningún contenido puede desmentirla.
+
+## Ni la respuesta del subagente se le pide al modelo
+
+El contrato de PROBE ordena pegar la respuesta del subagente «*verbatim. Do not
+summarize*». Medido: **a veces obedece y a veces resume.** En la corrida de G6.3
+resumió, y lo que quedó en `recon.md` fue una lista de secciones en vez del reporte
+—sin Evidence Ledger, que es el dispositivo entero del contrato de RECON contra la
+alucinación— y ese resumen viajó a BUILD como mapa con un número falso dentro.
+
+Una instrucción no es un mecanismo. Con `--format json` la respuesta del subagente
+sale del resultado del tool `task`, **que lo escribe el runtime**. El artefacto pasó
+de 30 líneas de resumen a 160 con sus diez secciones y su Evidence Ledger clasificado.
+
 ## Límite conocido, escrito en vez de escondido
 
 **Claude Code no dice en la entrada del hook qué agente está llamando.** Sin esa
