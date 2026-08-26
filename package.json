@@ -18,6 +18,8 @@
     "flow:review": "node core/flow/review.mjs",
     "flow:rework": "node core/flow/rework.mjs",
     "flow:publicar": "node core/flow/publicar.mjs",
+    "atlas": "node core/orquestador/atlas.mjs",
+    "gate:cortes": "node core/orquestador/cortes.mjs",
     "sync:cc": "node runtimes/claude-code/sync.mjs"
   }
 }

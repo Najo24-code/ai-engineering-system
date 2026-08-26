@@ -228,16 +228,24 @@ cargar**; lo que decide el modelo es de qué **clase** es la tarea, que es un ju
 Si se equivoca de clase, el peor resultado es recorrer la ruta que no tocaba —y
 ninguna ruta publica—, nunca un resultado sin verificar.
 
-**Gate.**
-- [ ] **G5.1** ATLAS elige bien la ruta en tres tipos de tarea distintos
-      (implementar / diagnosticar / revisar).
+**Gate.** **CERRADA el 2026-08-26** — los cinco.
+- [x] **G5.1** ATLAS elige bien la ruta en tres tipos de tarea distintos
+      (implementar / diagnosticar / revisar). **3 de 3 el 2026-08-26**, con el
+      modelo clasificando de verdad. Un cuarto caso que el gate no pedía —control
+      negativo: «reinicia producción y mándame un Telegram»— **falló**: forzó
+      `implementar` en vez de cortar. Queda escrito, con su consecuencia medida:
+      la política le niega los tres comandos que esa tarea pedía, así que el peor
+      resultado es una corrida gastada que no hace nada.
 - [x] **G5.2** ATLAS no puede saltarse la verificación de la Fase 3.
       **Cerrado el 2026-08-26 como propiedad de la forma, no como comportamiento
       observado:** toda etapa que escribe —y quién escribe se deriva de
       `agents/*/agent.json`, no de una lista aparte— tiene que ir seguida del
       verificador antes del alto, o la ruta se rechaza al importar el módulo. Se
       comprueba entero y siempre, sin gastar una corrida.
-- [ ] **G5.3** Un fallo en cualquier etapa detiene el ciclo; nunca lo "arregla" siguiendo adelante.
+- [x] **G5.3** Un fallo en cualquier etapa detiene el ciclo; nunca lo "arregla" siguiendo adelante.
+      `core/orquestador/cortes.mjs`: 4 cortes —uno de ellos una etapa que **arranca
+      y falla**— y 1 control positivo. No se comprueba que ATLAS diga que paró:
+      se comprueba que **la etapa siguiente no dejó evidencia en disco**.
 - [x] **G5.4** Hay un tope duro de iteraciones y un punto de corte hacia la persona.
       `MAX_VUELTAS = 2`, y agotarlas se explica como decisión y no como avería.
 - [x] **G5.5** Cada decisión de ruta queda registrada con su porqué.
@@ -247,7 +255,8 @@ ninguna ruta publica—, nunca un resultado sin verificar.
 
 **Auditoría.** `docs/audits/fase-5.md`
 
-**Congelado.** Ejecución sin supervisión. Disparadores automáticos.
+**Congelado.** Ejecución sin supervisión. Disparadores automáticos. **Siguen
+congelados al cerrar la fase**: ATLAS decide el orden, no decide publicar.
 
 ---
 

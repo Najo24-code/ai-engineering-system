@@ -39,6 +39,15 @@ const leer = (bandera) => {
 
 const target = leer("--target") ?? "lab"
 const soloBuild = args.includes("--skip-recon")
+/**
+ * El espejo de `--skip-recon`: entender sin tocar nada.
+ *
+ * Lo pide la ruta `diagnosticar` del orquestador. Hay tareas cuya respuesta es un
+ * mapa, no un cambio, y hacerlas pasar por BUILD sería contestar con código a una
+ * pregunta que nadie hizo — además de dejar el árbol tocado sin que nadie lo
+ * pidiera.
+ */
+const soloRecon = args.includes("--solo-recon")
 const refIssue = leer("--issue")
 
 if (!leer("--task") && !refIssue) {
@@ -60,8 +69,18 @@ if (!existsSync(CWD)) {
 }
 
 const sello = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)
-const SALIDA = join(ROOT, "runs", sello)
+/**
+ * Quien llama puede DICTAR dónde va la evidencia.
+ *
+ * Existe por el orquestador: sin esto tendría que adivinar qué corrida acaba de
+ * crearse mirando cuál es el directorio más nuevo. Eso es inferencia —y falla en
+ * cuanto hay dos ciclos a la vez, o alguien deja un directorio a medias—, y este
+ * sistema no puede permitirse deducir sobre qué evidencia está trabajando.
+ */
+const dictada = leer("--salida")
+const SALIDA = dictada ? (dictada.startsWith("/") ? dictada : join(ROOT, dictada)) : join(ROOT, "runs", sello)
 mkdirSync(SALIDA, { recursive: true })
+const NOMBRE = dictada ?? join("runs", sello)
 
 /** El runtime pinta la salida; el archivo guardado no debe llevar códigos de color. */
 const limpio = (s) => s.replace(/\[[0-9;]*m/g, "")
@@ -154,7 +173,7 @@ if (previos.length) {
 guardar("tarea.txt", `${task}\n`)
 guardar("objetivo.txt", `${target}\n`)
 
-console.log(`Corrida: runs/${sello}`)
+console.log(`Corrida: ${NOMBRE}`)
 console.log(`Objetivo: ${target}`)
 // La tarea de un issue trae su marco y su cuerpo entero. En pantalla se resume;
 // completa está en tarea.txt, que es de donde la leen las etapas siguientes.
@@ -181,7 +200,7 @@ if (!soloBuild) {
     guardar("recon.md", r.salida)
     console.log(`NO CORRIÓ (${r.fallo})`)
     console.error(`\nRECON no llegó a producir un reporte. Sin mapa, BUILD trabajaría a ciegas.`)
-    console.error(`Salida cruda en runs/${sello}/recon.md`)
+    console.error(`Salida cruda en ${NOMBRE}/recon.md`)
     process.exit(4)
   }
 
@@ -195,6 +214,14 @@ if (!soloBuild) {
 }
 
 // ── BUILD ──────────────────────────────────────────────────────────────────
+
+if (soloRecon) {
+  console.log(`\n${"═".repeat(64)}`)
+  console.log("Sólo RECON: no se tocó nada del proyecto.")
+  console.log(`Evidencia en ${NOMBRE}/recon.md`)
+  console.log("═".repeat(64))
+  process.exit(0)
+}
 
 const contexto = reporteRecon
   ? `You were given a RECON REPORT of this repository. Use it as your map instead of exploring from scratch. ` +
@@ -214,7 +241,7 @@ guardar("build.md", b.delegada ?? b.salida)
 
 if (b.fallo) {
   console.log(`NO CORRIÓ (${b.fallo})`)
-  console.error(`\nBUILD no llegó a trabajar. Salida cruda en runs/${sello}/build.md`)
+  console.error(`\nBUILD no llegó a trabajar. Salida cruda en ${NOMBRE}/build.md`)
   process.exit(4)
 }
 console.log("listo")
@@ -235,7 +262,7 @@ const archivos = diff
 console.log(`\n${"═".repeat(64)}`)
 console.log(`Archivos tocados: ${archivos.length || "ninguno"}`)
 for (const a of archivos) console.log(`  ${a}`)
-console.log(`\nEvidencia en runs/${sello}/`)
+console.log(`\nEvidencia en ${NOMBRE}/`)
 console.log("  recon.md       lo que RECON entendió")
 console.log("  build.md       lo que BUILD dice que hizo")
 console.log("  cambios.diff   lo que BUILD hizo de verdad")
