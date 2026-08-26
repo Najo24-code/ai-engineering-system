@@ -1,7 +1,7 @@
 /**
  * Pruebas de la salida a pull request.
  *
- * Las cuatro negativas son lo único que separa «un ciclo que verifica» de «un
+ * Las cinco negativas son lo único que separa «un ciclo que verifica» de «un
  * ciclo que verifica y luego publica lo que sea». Cada una tiene aquí su caso
  * que la dispara y su control positivo que demuestra que no está diciendo que no
  * a todo: una compuerta que niega siempre pasa por segura y no lo es, porque el
@@ -184,4 +184,33 @@ test("la deriva se explica separando qué clase de movimiento fue", () => {
 
 test("dos huellas idénticas no son deriva", () => {
   assert.equal(compararHuellas({ a: "1" }, { a: "1" }).iguales, true)
+})
+
+// ── 5. nada que ya estuviera sucio antes de que el agente corriera ─────────
+
+test("un archivo que ya estaba tocado antes de empezar no se publica", () => {
+  // El caso real del 2026-08-26: el instalador corrió después del último commit
+  // y `.opencode/agents/build.md` apareció en el diff como trabajo de BUILD.
+  const motivos = motivosParaNoPublicar({ ...publicable, previos: ["server/detectores.py"] })
+  assert.equal(motivos.length, 1)
+  assert.match(motivos[0], /ya estaban sin commitear/)
+  assert.match(motivos[0], /detectores\.py/)
+})
+
+test("lo que estaba sucio y el agente NO tocó no estorba", () => {
+  // El control positivo: un árbol con trabajo tuyo aparte no puede bloquear una
+  // publicación que no lo incluye.
+  assert.deepEqual(motivosParaNoPublicar({ ...publicable, previos: ["docs/borrador.md"] }), [])
+})
+
+test("sin previos declarados, el control no inventa un bloqueo", () => {
+  assert.deepEqual(motivosParaNoPublicar({ ...publicable, previos: [] }), [])
+  assert.deepEqual(motivosParaNoPublicar(publicable), [])
+})
+
+test("el motivo nombra los archivos, no solo cuántos", () => {
+  // Quien lo lea tiene que poder ir a arreglarlo sin volver a investigar.
+  const motivos = motivosParaNoPublicar({ ...publicable, previos: archivos })
+  assert.match(motivos[0], /server\/detectores\.py/)
+  assert.match(motivos[0], /server\/test_detectores\.py/)
 })

@@ -248,6 +248,50 @@ Lo cierra `runtimes/version.mjs`. **Avisa, no impide** —un gate que bloquea el
 trabajo por un salto de parche se desactiva la primera semana—, y no poder medir
 la versión **no** cuenta como que coincida.
 
+### La mitad viva: un agente corriendo ahí
+
+La credencial se montó **de solo lectura** desde el host, sin quedar grabada en
+ninguna imagen. Dos detalles que costaron una vuelta cada uno y valen para
+cualquier despliegue futuro:
+
+- **El uid tiene que coincidir.** La credencial es `0600` del uid 1000; el usuario
+  del contenedor era 1001 y no podía leerla. Se ajustó el contenedor al secreto,
+  nunca el secreto al contenedor.
+- **Montar un archivo suelto en una ruta que no existe** hace que Docker cree el
+  directorio padre como `root`, y opencode se queda sin poder escribir su estado
+  (`EACCES` al crear `.../opencode/repos`). Se crea el directorio en la imagen.
+
+**Y aquí el control de versión, escrito veinte minutos antes, se disparó solo y
+tenía razón.** Con opencode a medio instalar el instalador no dijo «listo» ni dio
+nada por bueno: dijo *«no se sabe qué versión hay puesta»* y explicó por qué eso
+importa. La regla del proyecto —lo que no se puede medir no pasa— funcionando en un
+caso que no existía cuando se escribió.
+
+Resuelto eso: **RECON produjo su reporte completo** (12 secciones, tabla de
+evidencia con Classification y Confidence) y **BUILD implementó y dejó la suite en
+verde**, en un userland que no había visto nunca este sistema.
+
+### El defecto que destapó la corrida limpia: el árbol de antes
+
+BUILD entregó 2 archivos y el flujo anunció **3**. El tercero era
+`.opencode/agents/build.md`, escrito por el **instalador**, que corrió después del
+último commit. BUILD no mintió: su informe nombra exactamente sus dos archivos.
+
+La causa es general y no tiene nada de contenedor: **el flujo diffea contra `HEAD`
+al terminar y nunca registra cómo estaba el árbol antes de que corriera nadie.**
+Todo lo que ya estuviera sucio se le atribuye al agente. Tiene dos caras:
+
+- **Roja**: el control de alcance rechaza una corrida impecable, con el motivo
+  apuntando al agente.
+- **Verde, y es la peor**: `publicar.mjs` empaqueta los archivos medidos, así que
+  el trabajo a medias de una persona acabaría **dentro del PR del agente, con el
+  sello de verificación encima**. Las otras cuatro negativas evitan errores que se
+  quedan en la máquina; esta evita uno que sale de ella.
+
+`recon-build.mjs` guarda ahora `arbol-previo.json` antes de arrancar y avisa si no
+está vacío. **No resta en silencio**: restar sería decidir por quien revisa, y un
+archivo puede estar tocado por los dos. Y `publicar.mjs` gana su quinta negativa.
+
 ### Estado, con lo que falta dicho
 
 Siguiendo el README corregido, de cero: `npm test` **237/237**,
@@ -255,12 +299,20 @@ Siguiendo el README corregido, de cero: `npm test` **237/237**,
 roto**, opencode instalado, y el sistema desplegado en un proyecto con su aviso de
 versión disparando.
 
-**Lo que NO está probado, y por eso el gate sigue abierto:** que un agente corra
-de verdad ahí. Eso exige mover una credencial al contenedor, y esa decisión no es
-del sistema. Después del hallazgo de la sustitución silenciosa de agente, este
-gate debería además exigir que los agentes queden **invocables**, no solo escritos
-en disco: el runtime puede aceptar la instalación y luego correr otro.
+**G6.4 CERRADO el 2026-08-26**, y con él la fase entera.
 
-## Lo que falta
+**El límite, escrito en vez de escondido:** un contenedor comparte el kernel del
+host. Lo que esta prueba NO puede decir es qué pasa en otro kernel o en otro
+hardware. Lo que sí dice, que es lo que el gate pregunta: que el README basta,
+que no queda ninguna dependencia escondida de la máquina donde se construyó
+—y había seis—, y que el sistema corre entero, agentes incluidos, en un userland
+que no lo había visto nunca. El requisito de user namespaces, que es lo más
+cercano al kernel que hay aquí, se ejerció de verdad.
 
-- **G6.4**: la mitad viva —que un agente corra en la instalación limpia.
+## Fase 6 — cerrada
+
+Los cinco gates. El sistema ya no vive dentro de OpenCode: el mismo contrato corre
+en dos runtimes sin tocar `agents/`, el trabajo entra por un issue y sale por un
+PR, las fronteras se volvieron a probar en el runtime nuevo, y la instalación
+limpia funciona siguiendo un README que ahora describe la instalación y no la
+máquina donde se escribió.

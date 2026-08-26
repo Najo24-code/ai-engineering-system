@@ -24,7 +24,8 @@ import { execFileSync } from "node:child_process"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { correrAgente, ordenDelegada } from "../verification/runner.mjs"
-import { diffCompleto } from "../verification/verdict.mjs"
+import { diffCompleto, archivosDelDiff } from "../verification/verdict.mjs"
+import { huellaDeArchivos } from "../verification/huella.mjs"
 import { parsearReferencia, motivosParaNoEntrar, componerTarea, traerIssue } from "./issue.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -119,6 +120,32 @@ if (refIssue) {
   console.log(`"${issue.title}"`)
   guardar("issue.json", JSON.stringify(issue, null, 2))
   task = componerTarea(issue)
+}
+
+/**
+ * Cómo estaba el árbol ANTES de que corriera nadie.
+ *
+ * Sin esta foto, el diff del final —que se toma contra `HEAD`— le atribuye al
+ * agente todo lo que ya estuviera sucio: una edición tuya a medias, el propio
+ * instalador si corrió después del último commit. Tiene dos caras y la segunda
+ * es la mala:
+ *
+ *   - Un archivo ajeno fuera del alcance hace que el verificador RECHACE una
+ *     corrida impecable, con el motivo apuntando al agente.
+ *   - Y al revés: `publicar.mjs` empaqueta los archivos medidos, así que tu
+ *     trabajo a medias acabaría **dentro del PR del agente, con el sello de
+ *     verificación encima**. Eso no es un rojo falso: es un verde falso que sale
+ *     de la máquina.
+ *
+ * No se resta en silencio: se guarda y se avisa. Restar sería decidir por quien
+ * revisa, y un archivo puede estar tocado por los dos.
+ */
+const previos = archivosDelDiff(CWD, "HEAD")
+guardar("arbol-previo.json", JSON.stringify({ base: "HEAD", archivos: previos, huella: huellaDeArchivos(CWD, previos) }, null, 2))
+if (previos.length) {
+  console.log(`\n⚠️  el árbol ya tenía ${previos.length} archivo(s) sin commitear ANTES de empezar:`)
+  for (const a of previos) console.log(`     ${a}`)
+  console.log("   Lo que salga de esta corrida no será todo del agente. Queda en arbol-previo.json.\n")
 }
 
 // La corrida tiene que poder leerse sola. Sin la tarea guardada, la etapa de

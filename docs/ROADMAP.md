@@ -238,7 +238,7 @@ ciclo de tres tiene que ser aburrido de tan confiable.
 
 **Entregable.** Un segundo adaptador de runtime y la entrada desde un issue.
 
-**Gate.** **ABIERTA** — 4 cerrados; falta G6.4.
+**Gate.** **CERRADA el 2026-08-26** — los cinco.
 - [x] **G6.1** El mismo contrato de agente corre en dos runtimes distintos.
       Segundo adaptador: `runtimes/claude-code/`, contra Claude Code 2.1.246.
       Los cuatro contratos se instalan y corren.
@@ -252,18 +252,14 @@ ciclo de tres tiene que ser aburrido de tan confiable.
       [`yunque#2`](https://github.com/Najo24-code/yunque/pull/2) (+209/−0, cierra #1),
       con la medición en el cuerpo del PR: 6 controles y 67 pruebas en verde.
       La vuelta de rechazo **no se provocó**: la pidió un defecto real.
-- [ ] **G6.4** El sistema se instala limpio en una máquina distinta siguiendo el README.
-      **Parcial el 2026-08-26**, en un contenedor Debian limpio: `npm test` 237/237,
-      recinto con 0 fugas, opencode instalado y el sistema desplegado. El README tenía
-      **seis huecos** —empezando por una credencial que llevaba un día sin ser la buena—
-      y de paso salió que `verified_version` no la comprobaba nadie. Falta la mitad viva:
-      que un agente corra ahí, lo que exige mover una credencial al contenedor.
-- [x] **G6.5** Las fronteras de las fases 1 y 2 siguen siendo reales en el runtime nuevo.
-      **No se heredaron: se volvieron a correr.** En una sesión real de Claude Code,
-      escribir fuera del alcance quedó NEGADO (`A-ALCANCE`, archivo intacto) y un
-      `ls` NEGADO (`A-COMANDO`); con **control positivo**, escribir dentro del
-      alcance SÍ ocurrió. El mecanismo de enforcement se midió con una sonda antes
-      de escribir el adaptador, no se leyó de la documentación.
+- [x] **G6.4** El sistema se instala limpio en una máquina distinta siguiendo el README.
+      **CERRADO el 2026-08-26** en un contenedor Debian limpio, con credencial montada
+      de solo lectura: `npm test` 237/237, recinto con 0 fugas, y **RECON y BUILD
+      corriendo de verdad** en un userland que no había visto el sistema. El README
+      tenía **seis huecos** —empezando por una credencial que llevaba un día sin ser la
+      buena— y la corrida destapó dos defectos más: `verified_version` no la comprobaba
+      nadie, y el flujo no registraba cómo estaba el árbol antes de arrancar.
+      Límite escrito: un contenedor comparte kernel; no dice nada de otro hardware.
 
 **Auditoría.** `docs/audits/fase-6.md`
 

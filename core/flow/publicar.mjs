@@ -14,7 +14,7 @@
  * no puede comprobar sobre sí mismo. Aquí se comprueban, fuera del agente, con
  * la evidencia que dejó la corrida.
  *
- * Las cuatro negativas, y por qué cada una:
+ * Las cinco negativas, y por qué cada una:
  *
  *   1. **Sin dictamen, no se publica.** Un PR con el sello del ciclo sobre un
  *      trabajo que nadie revisó es peor que un PR sin sello: el sello es lo que
@@ -23,10 +23,16 @@
  *      veredicto no vale, aunque diga APPROVED.
  *   3. **El verificador manda sobre el revisor.** APPROVED de REVIEW con
  *      RECHAZADO medido es un desacuerdo que resuelve la medición, siempre.
- *   4. **El árbol tiene que ser el mismo que se midió.** Esta es la que no se ve
- *      venir y la que de verdad importa: entre medir y publicar pasa tiempo, y
- *      si algo cambió, el PR llevaría el sello de una verificación hecha sobre
- *      otro contenido.
+ *   4. **El árbol tiene que ser el mismo que se midió.** Entre medir y publicar
+ *      pasa tiempo, y si algo cambió, el PR llevaría el sello de una verificación
+ *      hecha sobre otro contenido.
+ *   5. **Nada que ya estuviera sucio antes de empezar.** Las cuatro anteriores
+ *      protegen a quien revisa; esta protege a quien lanza el ciclo. El diff se
+ *      toma contra `HEAD` al terminar, así que un archivo que ya estaba tocado
+ *      —tu trabajo a medias, el propio instalador— se le atribuye al agente y
+ *      viajaría **dentro de su PR con el sello de verificación encima**. Las
+ *      otras cuatro evitan rojos falsos y verdes falsos que se quedan en la
+ *      máquina; esta evita uno que sale de ella.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs"
@@ -47,7 +53,7 @@ import { nombreDeRama } from "./issue.mjs"
  *
  * @returns {string[]} vacío significa que se puede publicar
  */
-export function motivosParaNoPublicar({ dictamen, medido, deriva, archivos }) {
+export function motivosParaNoPublicar({ dictamen, medido, deriva, archivos, previos = [] }) {
   const motivos = []
 
   if (!dictamen) motivos.push("la corrida no tiene dictamen.json: nadie revisó este trabajo")
@@ -69,6 +75,20 @@ export function motivosParaNoPublicar({ dictamen, medido, deriva, archivos }) {
   }
 
   if (!archivos?.length) motivos.push("no hay ni un archivo tocado: no hay nada que publicar")
+
+  // La quinta negativa, y la única que protege a quien lanza el ciclo en vez de
+  // proteger al que lo revisa: si un archivo ya estaba sucio ANTES de que el
+  // agente corriera, publicarlo metería trabajo ajeno dentro del PR del agente,
+  // con el sello de verificación encima. No se decide aquí de quién es cada
+  // línea —puede ser de los dos—: se para y lo dice.
+  const yaEstaban = (archivos ?? []).filter((a) => (previos ?? []).includes(a))
+  if (yaEstaban.length) {
+    motivos.push(
+      `${yaEstaban.length} archivo(s) ya estaban sin commitear antes de que el agente corriera: ${yaEstaban.join(", ")}. ` +
+        `Publicarlos metería trabajo que no es suyo dentro de su PR, firmado por la verificación. ` +
+        `Commitea o descarta eso aparte y vuelve a medir`,
+    )
+  }
 
   // Una corrida anterior a que existiera el sello no se puede comparar, y a un
   // "no se puede comparar" no se le contesta con un "adelante". La ausencia de
@@ -237,7 +257,17 @@ if (process.argv[1] && basename(process.argv[1]) === basename(esteArchivo)) {
     ? compararHuellas(huellaMedida, huellaAhora)
     : { iguales: false, aparecieron: [], desaparecieron: [], cambiaron: [], sinSello: true }
 
-  const motivos = motivosParaNoPublicar({ dictamen, medido, deriva, archivos })
+  // La foto de antes vive en la corrida original; una vuelta de rework la hereda.
+  const previo =
+    leerJSON("arbol-previo.json") ??
+    (existsSync(join(dirname(DIR), "arbol-previo.json")) ? JSON.parse(readFileSync(join(dirname(DIR), "arbol-previo.json"), "utf8")) : null)
+
+  const motivos = motivosParaNoPublicar({ dictamen, medido, deriva, archivos, previos: previo?.archivos ?? [] })
+  if (!previo) {
+    motivos.push(
+      "la corrida no guardó cómo estaba el árbol antes de empezar: no se puede distinguir lo que hizo el agente de lo que ya estaba",
+    )
+  }
 
   console.log(`Corrida  : ${corrida}`)
   console.log(`Proyecto : ${target}`)
