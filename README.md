@@ -180,10 +180,11 @@ absoluta. Si mueves el sistema de sitio, vuelve a correr el paso 1.
 npm test                  # 271 tests, ~1 s, CERO llamadas al proveedor
 npm run gate:contencion   # el recinto: 13 ataques deterministas, cuesta cero
 npm run relevo            # regenera runtimes/opencode/eleccion.json (gitignored)
-npm run sync:check        # ¿los agentes instalados coinciden con sus contratos?
+npm run sync               # materializa lab/.opencode/ (gitignored)
+npm run sync:check        # ¿lo instalado coincide con lo que sync acaba de escribir?
 ```
 
-Estos cuatro se pueden correr siempre. Los que llaman al modelo —
+Estos cinco se pueden correr siempre. Los que llaman al modelo —
 `core/verification/wiring.mjs` y `core/verification/boundary.mjs` — cuestan
 corridas reales y por eso no son parte de `npm test`: una suite que gasta cuota
 del proveedor se deja de correr, y una suite que no se corre no protege nada.
@@ -192,12 +193,13 @@ del proveedor se deja de correr, y una suite que no se corre no protege nada.
 salida a internet convierte un ataque contenido en un "no discrimina" que no es
 verdad.
 
-⚠️ **`sync:check` necesita `eleccion.json` para estar de acuerdo consigo mismo.**
-Los `.md` generados llevan el modelo que eligió el relevo, y esa elección no se
-versiona (caduca con la cuota del día). En un árbol recién clonado —sin haber
-corrido `relevo` todavía— `sync:check` compara contra el `model_map` por
-defecto y los cinco agentes salen "desincronizados" sin que nada esté roto:
-solo hace falta correr `npm run relevo` primero. Así lo hace `.github/workflows/ci.yml`.
+⚠️ **`sync:check` en un árbol recién clonado sale "desincronizado" sin que nada
+esté roto**, por dos razones que son la misma: los `.opencode/` que compara son
+gitignored a propósito (`eleccion.json` caduca con la cuota del día;
+`plugins/policy-gate.ts` lleva una ruta absoluta que pertenece a la máquina
+donde se instaló, ver más abajo). Sin haber corrido `relevo` y `sync` primero
+no hay contra qué comparar. El orden que de verdad hace falta es
+`relevo` → `sync` → `sync:check`, y así lo corre `.github/workflows/ci.yml`.
 
 ⚠️ **El recinto (`bwrap`) necesita el intérprete montado, y en máquinas con
 `node` fuera de `/usr`** (nvm, asdf, volta, los runners de GitHub Actions,
