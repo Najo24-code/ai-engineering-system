@@ -31,5 +31,8 @@ jobs:
       - name: gate:contencion (el recinto, 13 ataques, cuesta cero)
         run: npm run gate:contencion
 
+      - name: relevo (regenera runtimes/opencode/eleccion.json, gitignored)
+        run: npm run relevo
+
       - name: sync:check (¿los agentes instalados coinciden con su contrato?)
         run: npm run sync:check

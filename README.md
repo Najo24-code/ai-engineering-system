@@ -177,12 +177,13 @@ absoluta. Si mueves el sistema de sitio, vuelve a correr el paso 1.
 ## Comprobar que las fronteras siguen siendo reales
 
 ```bash
-npm test                  # 270 tests, ~1 s, CERO llamadas al proveedor
+npm test                  # 271 tests, ~1 s, CERO llamadas al proveedor
 npm run gate:contencion   # el recinto: 13 ataques deterministas, cuesta cero
+npm run relevo            # regenera runtimes/opencode/eleccion.json (gitignored)
 npm run sync:check        # ¿los agentes instalados coinciden con sus contratos?
 ```
 
-Estos tres se pueden correr siempre. Los que llaman al modelo —
+Estos cuatro se pueden correr siempre. Los que llaman al modelo —
 `core/verification/wiring.mjs` y `core/verification/boundary.mjs` — cuestan
 corridas reales y por eso no son parte de `npm test`: una suite que gasta cuota
 del proveedor se deja de correr, y una suite que no se corre no protege nada.
@@ -190,6 +191,21 @@ del proveedor se deja de correr, y una suite que no se corre no protege nada.
 ⚠️ `gate:contencion` mide la red. Correrlo dentro de un sandbox que bloquee la
 salida a internet convierte un ataque contenido en un "no discrimina" que no es
 verdad.
+
+⚠️ **`sync:check` necesita `eleccion.json` para estar de acuerdo consigo mismo.**
+Los `.md` generados llevan el modelo que eligió el relevo, y esa elección no se
+versiona (caduca con la cuota del día). En un árbol recién clonado —sin haber
+corrido `relevo` todavía— `sync:check` compara contra el `model_map` por
+defecto y los cinco agentes salen "desincronizados" sin que nada esté roto:
+solo hace falta correr `npm run relevo` primero. Así lo hace `.github/workflows/ci.yml`.
+
+⚠️ **El recinto (`bwrap`) necesita el intérprete montado, y en máquinas con
+`node` fuera de `/usr`** (nvm, asdf, volta, los runners de GitHub Actions,
+que lo instalan en `/opt/hostedtoolcache/`) hay que tener bubblewrap instalado
+y, en Ubuntu 24.04+, permitir user namespaces sin privilegios:
+`sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0`. El propio
+`correrSuiteAislada` monta el intérprete de solo lectura desde donde de verdad
+esté (`process.execPath`), así que lo único que falta ponerlo es el sysctl.
 
 ---
 
