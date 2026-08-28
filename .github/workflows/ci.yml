@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   gates-que-no-cuestan-cuota:
@@ -20,6 +21,9 @@ jobs:
 
       - name: instalar bubblewrap (el recinto)
         run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
+      - name: permitir user namespaces sin privilegios (Ubuntu 24.04 los restringe por defecto)
+        run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: npm test
         run: npm test
