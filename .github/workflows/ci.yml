@@ -25,6 +25,11 @@ jobs:
       - name: permitir user namespaces sin privilegios (Ubuntu 24.04 los restringe por defecto)
         run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
 
+      - name: DEBUG bwrap crudo
+        run: |
+          bwrap --unshare-all --die-with-parent --clearenv --new-session \
+            --proc /proc --dev /dev --chdir /tmp -- /bin/echo ok || echo "EXIT=$?"
+
       - name: npm test
         run: npm test
 
