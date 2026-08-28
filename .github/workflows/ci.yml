@@ -34,7 +34,7 @@ jobs:
       - name: relevo (regenera runtimes/opencode/eleccion.json, gitignored)
         run: npm run relevo
 
-      - name: sync (materializa lab/.opencode/, gitignored: no hay contra qué comparar sin esto)
+      - name: "sync (materializa lab/.opencode/, gitignored: no hay contra qué comparar sin esto)"
         run: npm run sync
 
       - name: sync:check (¿lo instalado coincide con lo que sync acaba de escribir?)
