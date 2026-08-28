@@ -17,6 +17,10 @@
         "git log"
       ]
     },
+    "classifier": {
+      "write": [],
+      "shell": []
+    },
     "probe": {
       "write": [],
       "shell": []

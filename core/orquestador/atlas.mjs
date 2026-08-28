@@ -140,11 +140,13 @@ if (claseForzada) {
     `Classify this task into exactly ONE of these classes and nothing else.\n\n` +
     CLASES.map((c) => `- ${c}: ${RUTAS[c].porque}`).join("\n") +
     `\n\n=== THE TASK ===\n${textoTarea}\n=== END TASK ===\n\n` +
-    `Answer with one line and nothing more:\nClase: <${CLASES.join("|")}>\n\n` +
+    `Target project: ${CWD}\n\n` +
+    `Read the project if you need context. Then answer with exactly this format:\n\n` +
+    `## Clase\n<${CLASES.join("|")}|ninguna>\n\n## Justificación\n<one to three sentences>\n\nClase: <${CLASES.join("|")}|ninguna>\n\n` +
     `If it does not fit exactly one of them, answer "Clase: ninguna". Do not invent a class ` +
     `and do not pick the closest one: an unclear task goes to a person, which is a good outcome, not a failure.`
 
-  const r = correrAgente({ agente: "probe", cwd: CWD, mensaje: orden, timeoutMs: 5 * 60 * 1000 })
+  const r = correrAgente({ agente: "classifier", cwd: CWD, mensaje: orden, timeoutMs: 5 * 60 * 1000 })
   writeFileSync(join(CICLO, "clasificacion.md"), r.delegada ?? r.salida)
 
   if (r.fallo) {

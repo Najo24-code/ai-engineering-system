@@ -18,7 +18,7 @@ import { CLASES, leerClase, decidir, renglonDeBitacora, explicarCorte } from "./
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 const contrato = (id) => JSON.parse(readFileSync(join(ROOT, "agents", id, "agent.json"), "utf8"))
-const CONTRATOS = Object.fromEntries(["recon", "build", "review", "probe"].map((id) => [id, contrato(id)]))
+const CONTRATOS = Object.fromEntries(["recon", "build", "review", "probe", "classifier"].map((id) => [id, contrato(id)]))
 
 // ── quién escribe sale de los contratos, no de una lista a mano ────────────
 
@@ -172,4 +172,74 @@ test("un corte dice en qué etapa fue y por qué no se sigue", () => {
   assert.match(t, /Se detuvo en "build"/)
   assert.match(t, /negó toda escritura/)
   assert.match(t, /produce evidencia que parece buena y no lo es/)
+})
+
+// ── el contrato de classifier ────────────────────────────────────────────
+
+test("el contrato de classifier existe y es válido", () => {
+  const c = contrato("classifier")
+  assert.equal(c.id, "classifier")
+  assert.ok(c.tools.allow.includes("read"))
+  assert.ok(c.tools.deny.includes("write"))
+  assert.ok(c.tools.deny.includes("edit"))
+  assert.ok(c.tools.deny.includes("bash"))
+  assert.ok(c.output.must_end_with.includes("Clase: <implementar|diagnosticar|revisar|ninguna>"))
+})
+
+test("classifier no puede modificar nada", () => {
+  const c = contrato("classifier")
+  assert.deepEqual(c.scope.write, [])
+  assert.deepEqual(c.scope.shell, [])
+})
+
+test("la salida de classifier con formato correcto es parseable por decidir.mjs", () => {
+  // Este es el formato que classifier debe producir según su prompt
+  const salidaClassifier = `## Clase
+implementar
+
+## Justificación
+La tarea requiere modificar src/routes/items.routes.ts para añadir validación de UUID. Es un cambio de código, no una investigación ni una revisión.
+
+Clase: implementar`
+
+  const clase = leerClase(salidaClassifier)
+  assert.equal(clase, "implementar")
+
+  const d = decidir({ salidaDelModelo: salidaClassifier, tarea: "fix #43" })
+  assert.equal(d.clase, "implementar")
+  assert.equal(d.quien, "modelo")
+  assert.equal(d.corte, null)
+})
+
+test("classifier puede responder 'ninguna' cuando la tarea no encaja", () => {
+  const salidaClassifier = `## Clase
+ninguna
+
+## Justificación
+La tarea pide desplegar a producción, lo cual no es una clase que este sistema maneje. El despliegue requiere autorización humana.
+
+Clase: ninguna`
+
+  const clase = leerClase(salidaClassifier)
+  // "ninguna" no es una clase válida, así que leerClase devuelve null
+  assert.equal(clase, null)
+
+  const d = decidir({ salidaDelModelo: salidaClassifier, tarea: "deploy" })
+  assert.ok(d.corte)
+  assert.equal(d.clase, null)
+  assert.equal(d.quien, "regla")
+})
+
+test("la justificación de classifier no interfiere con el parser", () => {
+  // La justificación puede mencionar las otras clases, pero solo una debe estar en la línea final
+  const salidaClassifier = `## Clase
+diagnosticar
+
+## Justificación
+Aunque podría parecer implementar, la tarea pide investigar por qué falla el endpoint. No requiere cambios de código, solo diagnóstico. No es revisar porque no hay código existente que juzgar.
+
+Clase: diagnosticar`
+
+  const clase = leerClase(salidaClassifier)
+  assert.equal(clase, "diagnosticar")
 })

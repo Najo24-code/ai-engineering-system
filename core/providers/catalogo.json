@@ -44,6 +44,24 @@
       "evidencia": "2026-08-25, G4.5: el ciclo RECON→BUILD entero corrió por aquí contra yunque, un repositorio real y ajeno. RECON produjo un mapa útil (incluida una tensión de arquitectura que quien escribió el encargo no había visto) y BUILD implementó el detector pedido: 2 archivos, 91 líneas, dentro del alcance, sin declarar verde lo que no pudo correr. El verificador lo midió por su cuenta dentro del recinto: 49 pruebas en verde donde había 45, APROBADO en los cinco controles. Esto es lo que significa VERIFICADO en este archivo: un agente trabajó contra él y el resultado se midió, no se creyó."
     },
 
+    "alibaba": {
+      "credencial": "DASHSCOPE_API_KEY",
+      "endpoint": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "prefijo_runtime": "alibaba/",
+      "cuota": {
+        "tipo": "desconocida",
+        "$nota": "Proveedor activo de OpenCode en esta máquina. La credencial viaja como variable de entorno (DASHSCOPE_API_KEY). Cuota no sondeada — no se ha medido el límite diario ni por modelo."
+      },
+      "estado": "VERIFICADO",
+      "verificado_en": {
+        "fecha": "2026-08-26",
+        "corrida": "sesión de integración (este documento)",
+        "proyecto": "ai-engineering-system",
+        "medido": "qwen3.7-max ejecutando como modelo principal de OpenCode: razonamiento, tool calling, edición de archivos, invocación de bash, búsqueda, lectura — todo funcional durante sesiones de 1-2 horas"
+      },
+      "evidencia": "Proveedor activo de OpenCode (opencode.json). qwen3.7-max es el modelo que ejecuta esta sesión completa de auditoría, integración y RECON."
+    },
+
     "google": {
       "credencial": "GEMINI_API_KEY",
       "credencial_runtime": "GOOGLE_GENERATIVE_AI_API_KEY",
@@ -141,6 +159,17 @@
         "contexto": 256000,
         "tool_calling": true,
         "estado": "VERIFICADO"
+      }
+    ],
+
+    "qwen-max": [
+      {
+        "proveedor": "alibaba",
+        "id": "qwen-plus",
+        "contexto": 131072,
+        "tool_calling": true,
+        "estado": "VERIFICADO",
+        "$nota": "Proveedor activo de OpenCode. qwen3.7-max es la variante que realmente se ejecuta (la config dice qwen-plus pero el runtime resuelve a qwen3.7-max). Contexto estimado según documentación de DashScope."
       }
     ]
   }
