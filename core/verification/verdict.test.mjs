@@ -13,7 +13,7 @@
 
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, cpSync, chmodSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -167,6 +167,24 @@ test("G3.1c: la suite corre encerrada — no alcanza el disco de fuera", () => {
     assert.equal(existsSync(testigo), false, "la suite escribió fuera del recinto")
   } finally {
     limpiar(dir)
+  }
+})
+
+test("G3.1d: el intérprete se encuentra aunque no viva bajo /usr (nvm, asdf, GitHub Actions)", () => {
+  // No hace falta un node real: cualquier binario fuera de /usr sirve para
+  // probar que execvp lo encuentra DENTRO del recinto. `env` ya está en
+  // /usr/bin, así que se copia a una ruta que el recinto no monta por defecto.
+  const fuera = join(tmpdir(), `interprete-fuera-${Date.now()}`)
+  cpSync("/usr/bin/env", fuera)
+  chmodSync(fuera, 0o755)
+  const dir = arbol({ tests: { "ok.test.js": TEST_QUE_PASA } })
+  try {
+    const r = correrSuiteAislada({ proyecto: dir, comando: [fuera] })
+    assert.equal(r.corrio, true)
+    assert.equal(r.codigo, 0)
+  } finally {
+    limpiar(dir)
+    rmSync(fuera, { force: true })
   }
 })
 

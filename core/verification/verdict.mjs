@@ -106,7 +106,14 @@ export function leerTap(salida) {
  * un servicio de fuera, y tampoco puede mandar hacia fuera lo que encontró.
  */
 export function correrSuiteAislada({ proyecto, comando = [process.execPath, "--test"], red = false }) {
-  const recinto = perfil({ proyecto, home: "/home/verificador", red })
+  // El intérprete que corre esta corrida no siempre vive bajo /usr: nvm, asdf,
+  // volta y los runners de GitHub Actions lo instalan en otro lado (medido:
+  // /opt/hostedtoolcache/node/.../bin/node). Sin esto, `execvp` no lo encuentra
+  // DENTRO del recinto y la suite "no llega a correr" en cualquier máquina que
+  // no tenga el node del sistema — el mismo patrón que perfilOpenCode ya usa
+  // para el binario de opencode.
+  const herramientas = comando[0]?.startsWith("/") ? [comando[0]] : []
+  const recinto = perfil({ proyecto, home: "/home/verificador", red, herramientas })
   try {
     const salida = execFileSync("bwrap", argv(recinto, comando), {
       encoding: "utf8",
