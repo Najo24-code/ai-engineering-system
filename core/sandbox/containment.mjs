@@ -155,6 +155,9 @@ function correrEnRecinto({ proyecto: p, repo }) {
     proyecto: p,
     home: "/home/agente",
     red: false,
+    // Mismo hueco que en verdict.mjs: el node que corre esto no siempre vive
+    // bajo /usr (nvm, asdf, GitHub Actions lo instalan en otro lado).
+    herramientas: NODE.startsWith("/") ? [NODE] : [],
     entorno: { ADV_HOST_HOME: HOGAR, ADV_HOST_REPO: repo },
   })
 
