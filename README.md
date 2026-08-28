@@ -1,5 +1,7 @@
 # AI Engineering System
 
+[![ci](https://github.com/Najo24-code/ai-engineering-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Najo24-code/ai-engineering-system/actions/workflows/ci.yml)
+
 Sistema de ingeniería de software multiagente: agentes con responsabilidades
 separadas, permisos que de verdad se aplican y resultados que se verifican en vez
 de creerse.
@@ -175,7 +177,7 @@ absoluta. Si mueves el sistema de sitio, vuelve a correr el paso 1.
 ## Comprobar que las fronteras siguen siendo reales
 
 ```bash
-npm test                  # 237 tests, ~1 s, CERO llamadas al proveedor
+npm test                  # 270 tests, ~1 s, CERO llamadas al proveedor
 npm run gate:contencion   # el recinto: 13 ataques deterministas, cuesta cero
 npm run sync:check        # ¿los agentes instalados coinciden con sus contratos?
 ```
@@ -199,9 +201,16 @@ verdad.
 | 1 · Un agente encerrado | que la frontera sea real | **cerrada** |
 | 2 · Frontera de escritura | que BUILD no se salga | **cerrada** |
 | 3 · Verificación | que el sistema no crea | **cerrada** |
-| 4 · Ciclo de tres | RECON → BUILD → REVIEW | en curso |
-| 5 · Orquestación | que ATLAS decida | |
-| 6 · Portabilidad | que sobreviva fuera de OpenCode | |
+| 4 · Ciclo de tres | RECON → BUILD → REVIEW | **cerrada** |
+| 5 · Orquestación | que ATLAS decida, no que el modelo elija la ruta | **cerrada** |
+| 6 · Portabilidad | que sobreviva fuera de OpenCode | **cerrada** |
+
+**Las siete fases del plan original están cerradas** (2026-08-26). El issue
+`Najo24-code/yunque#1` entró solo y salió como PR (`yunque#2`), con una vuelta
+de rechazo que pidió un defecto real, no una simulada. Lo que sigue no está
+escrito todavía: el propio `docs/ROADMAP.md` dice que la escala se mide en
+*cuántas tareas puede ejecutar a la vez sin que nadie las vigile*, y eso no es
+ninguna de las siete.
 
 Detalle en [`docs/ROADMAP.md`](docs/ROADMAP.md); un informe por fase en
 [`docs/audits/`](docs/audits/).

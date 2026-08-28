@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates-que-no-cuestan-cuota:
+    # Solo lo que package.json ya distingue como gratis y determinista:
+    # sin esto no hay nada que instalar (cero dependencias) y sin bwrap
+    # fallan 5 pruebas de la suite (docs: README.md, sección "Requisitos").
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: instalar bubblewrap (el recinto)
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
+      - name: npm test
+        run: npm test
+
+      - name: gate:contencion (el recinto, 13 ataques, cuesta cero)
+        run: npm run gate:contencion
+
+      - name: sync:check (¿los agentes instalados coinciden con su contrato?)
+        run: npm run sync:check
