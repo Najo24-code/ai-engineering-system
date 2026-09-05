@@ -73,10 +73,10 @@ describe("RealtimeAuditor", () => {
   it("sanitizeArgs: redacts sensitive keys", async () => {
     const mod = await import("../.opencode/plugins/realtime-auditor.ts")
     const result = mod.sanitizeArgs({
-      API_KEY: "sk-abc123secret",
-      password: "hunter2",
-      token: "ghp_abc123",
-      name: "jonas",
+      API_KEY: "sk-<DUMMY>",
+      password: "<DUMMY>",
+      token: "ghp_<DUMMY>",
+      name: "<DUMMY>",
     })
     assert.equal(result.API_KEY, "[REDACTED]")
     assert.equal(result.password, "[REDACTED]")
