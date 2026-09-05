@@ -1,124 +1,133 @@
-# AI Engineering System
+<h1 align="center">
+  <code>AI ENGINEERING SYSTEM</code>
+</h1>
 
-[![ci](https://github.com/Najo24-code/ai-engineering-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Najo24-code/ai-engineering-system/actions/workflows/ci.yml)
+<p align="center">
+  <em>Multi-agent software engineering: boundaries that are proven, not declared.</em>
+</p>
 
-Sistema de ingeniería de software multiagente: agentes con responsabilidades
-separadas, permisos que de verdad se aplican y resultados que se verifican en vez
-de creerse.
+<p align="center">
+  <a href="https://github.com/Najo24-code/ai-engineering-system/actions/workflows/ci.yml">
+    <img src="https://github.com/Najo24-code/ai-engineering-system/actions/workflows/ci.yml/badge.svg" alt="ci">
+  </a>
+  <img src="https://img.shields.io/badge/license-MIT-3fb950?style=flat-square&labelColor=0d1117" alt="MIT">
+  <img src="https://img.shields.io/badge/node-22+-339933?style=flat-square&labelColor=0d1117" alt="Node 22+">
+  <img src="https://img.shields.io/badge/phase-7_7-58a6ff?style=flat-square&labelColor=0d1117" alt="7/7 phases closed">
+</p>
 
-De uso personal. Pensado para funcionar en cualquier entorno, no dentro de una
-herramienta concreta.
+---
 
-## La idea en una frase
-
-Un agente no se define por su prompt, sino por lo que **no** puede hacer y por lo
-que otro mecanismo **comprueba** de su trabajo.
-
-De ahí sale la regla que sostiene todo lo demás:
-
-> **Una política sin prueba de cableado se considera NO implementada.**
-> El test de unidad no basta. Hay que demostrar, con el sistema corriendo, que
-> la acción prohibida falla de verdad — y con control positivo, porque si no,
-> un agente perezoso y una frontera sólida producen el mismo resultado.
-
-Escribir la regla y cablear la regla son dos trabajos distintos, y solo el
-segundo protege algo.
-
-## Estructura
-
+```text
+$ cat /etc/motd
 ```
-agents/       contratos de agente, portables      (fuente de verdad)
+
+An agent is not defined by its prompt, but by what it **cannot** do
+and what another mechanism **verifies** about its work.
+
+> **A policy without a wiring test is considered NOT implemented.**
+> Unit tests are not enough. You must prove, with the system running,
+> that the forbidden action actually fails — with positive control,
+> because a lazy agent and a solid boundary produce the same result.
+
+Writing the rule and wiring the rule are two different jobs. Only the second protects something.
+
+---
+
+## `$ tree .`
+
+```text
+agents/       agent contracts, portable            (source of truth)
 core/
-  policies/     reglas de permiso cableadas a hooks
-  sandbox/      el recinto: lo prohibido no se deniega, se vuelve imposible
-  verification/ el que comprueba y no cree
-  flow/         las etapas del ciclo, que dispara una persona
+  policies/     permission rules wired to hooks
+  sandbox/      the enclosure: forbidden is not denied, it is impossible
+  verification/ the one that measures and does not believe
+  flow/         the stages of the cycle, triggered by a person
 runtimes/
-  opencode/   adaptador para OpenCode, y el plugin del policy gate
-lab/          banco de pruebas: el repo sobre el que trabajan los agentes
+  opencode/   OpenCode adapter + policy gate plugin
+  claude-code/  Claude Code adapter
+lab/          test bench: the repo agents work on
 docs/
-  ARCHITECTURE.md  las cinco capas y dónde bloquea cada nivel
-  ROADMAP.md       las siete fases y el gate de cada una
-  audits/          un informe por fase; sin él la fase no cierra
+  ARCHITECTURE.md  the five layers and where each blocks
+  ROADMAP.md       the seven phases and the gate for each
+  audits/          one report per phase; without it the phase stays open
 ```
 
-Regla de dependencia: `agents/` no importa nada de `runtimes/`. El día que el
-runtime sea otro, se reescribe un adaptador, no los agentes.
+Dependency rule: `agents/` imports nothing from `runtimes/`. When the runtime
+changes, rewrite an adapter — not the agents.
 
 ---
 
-## El ciclo
+## `$ cat cycle.md` — the loop
 
+```text
+ISSUE -> RECON -> BUILD -> [verifier] -> REVIEW -> (reject) -> BUILD
+        understand  measure     judge
+                                    -> [publish] -> PR
 ```
-ISSUE →  RECON  →  BUILD  →  [verificador]  →  REVIEW  →  (rechazo) → BUILD
-         entiende  implementa   MIDE            JUZGA          ↓
-                                                          [publicar] → PR
-```
 
-Entra por un issue de GitHub y sale por un pull request. Las dos puntas son
-código determinista, no agentes: **ningún agente abre un PR**, porque publicar
-exige comprobar cosas que quien hizo el trabajo no puede comprobar sobre sí mismo.
+Enters through a GitHub issue, exits through a pull request. Both endpoints
+are deterministic code, not agents: **no agent opens a PR**, because publishing
+requires verifying things the one who did the work cannot verify about itself.
 
-Entre etapa y etapa aprieta el botón una persona. El orquestador es de la Fase 5;
-hasta que el ciclo sea aburrido de tan confiable, automatizar el disparo solo
-sirve para equivocarse más rápido.
+Between stages, a person presses the button. The orchestrator is Phase 5;
+until the cycle is boringly reliable, automating the trigger only helps
+you make mistakes faster.
 
-| Agente | Puede | No puede |
+| Agent | Can | Cannot |
 |---|---|---|
-| **RECON** | leer | escribir, ejecutar, delegar |
-| **BUILD** | escribir donde diga la instalación del proyecto, correr la verificación | salir de su alcance, tocar secretos o CI, instalar, hacer commit |
-| **REVIEW** | leer | **modificar nada**, **ejecutar nada** — ni siquiera los tests |
+| **RECON** | read | write, execute, delegate |
+| **BUILD** | write where the project says, run verification | go out of scope, touch secrets or CI, install, commit |
+| **REVIEW** | read | **modify nothing**, **execute nothing** — not even tests |
 
-Que REVIEW no corra los tests es deliberado: si los corriera y reportara el
-resultado, el sistema volvería a depender de que un agente diga la verdad sobre
-los tests. Eso lo mide el verificador, que no es un agente.
-
-## Las cinco capas de control
-
-Están en `docs/ARCHITECTURE.md` con la evidencia de cada una.
-
-- **A** declarativo — el runtime no le entrega la herramienta.
-- **B** programático — el policy gate decide por ruta y por comando en cada llamada.
-- **C** observación — audita; no bloquea.
-- **D** el recinto — `core/sandbox/`, bubblewrap. Lo prohibido no se deniega: se
-  vuelve **imposible**. Niega por omisión, así que no depende de que alguien se
-  acordara de enumerar el peligro.
-- **E** el verificador — `core/verification/verdict.mjs`. No bloquea acciones:
-  rechaza **afirmaciones**. Regla dura: **lo que no se puede medir no pasa.**
-  Mide cinco: la suite (la corre él, encerrada), la regresión de la suite, el
-  alcance del diff, los secretos que añade y las citas del informe. La de
-  regresión existe porque las otras cuatro miran el estado final, y borrar los
-  tests que se pusieron en rojo deja un estado final impecable.
+REVIEW not running the tests is deliberate: if it ran them and reported the
+result, the system would again depend on an agent telling the truth about
+the tests. The verifier measures that — and the verifier is not an agent.
 
 ---
 
-## Apuntarlo a un proyecto tuyo
+## `$ layers --show` — the five control layers
 
-### Requisitos
+Each layer is backed by evidence in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-Medidos el 2026-08-26 montando una instalación limpia desde cero, no recordados.
-Lo que decía antes esta sección describía la máquina donde se construyó el
-sistema, que es exactamente lo que la Fase 6 existe para no dar por bueno.
-
-| qué | por qué | cómo se pone |
+| Layer | Name | Mechanism |
 |---|---|---|
-| `node` 22+ | el sistema entero | — |
-| `git` | el verificador compara el árbol contra `HEAD` | `apt install git` |
-| `bwrap` (bubblewrap) | **el recinto**, y sin él fallan 5 pruebas de la suite | `apt install bubblewrap` |
-| `opencode` | el runtime | `curl -fsSL https://opencode.ai/install \| bash` |
-| credencial del proveedor | las llamadas al modelo | `opencode auth login` |
-| `gh` autenticado | **solo** para `publicar.mjs` | `gh auth login` |
+| **A** | Declarative | The runtime does not hand over the tool |
+| **B** | Programmatic | The policy gate decides per route, per command, per call |
+| **C** | Observational | Audits; does not block |
+| **D** | The Enclosure | `core/sandbox/` — bubblewrap. Forbidden is not denied: it is **impossible** |
+| **E** | The Verifier | `core/verification/verdict.mjs`. Does not block actions: rejects **claims** |
 
-⚠️ **La credencial NO va en el entorno.** Esta sección decía «`OPENROUTER_API_KEY`
-en el entorno» y era falso desde el 2026-08-25: el proveedor es OpenCode Zen y su
-credencial vive donde la deja `opencode auth login` (`~/.local/share/opencode/auth.json`).
-Quien siguiera el README ponía una variable que no se usa y le faltaba la que sí.
+The verifier measures five things:
 
-⚠️ **El recinto exige user namespaces sin privilegios.** Es una propiedad del
-sistema donde corre, no del proyecto, y no estaba escrita en ninguna parte.
-Sin ella `bwrap` no arranca y **cinco pruebas de `npm test` fallan con mensajes
-que parecen defectos del verificador**. Dentro de un contenedor hacen falta las
-tres, medidas una por una (ninguna es `--privileged` ni `--cap-add`):
+1. The full test suite (runs it, in isolation)
+2. Suite regression (catches deleted-red-test state)
+3. Diff scope
+4. Secrets introduced
+5. Report citations
+
+---
+
+## `$ cd /any/project` — point it at yours
+
+### Prerequisites
+
+Measured 2026-08-26 on a clean install from scratch. Not remembered.
+
+| What | Why | How |
+|---|---|---|
+| `node` 22+ | the entire system | — |
+| `git` | the verifier compares the tree against `HEAD` | `apt install git` |
+| `bwrap` (bubblewrap) | **the enclosure** — 5 tests fail without it | `apt install bubblewrap` |
+| `opencode` | the runtime | `curl -fsSL https://opencode.ai/install \| bash` |
+| provider credential | model calls | `opencode auth login` |
+| `gh` authenticated | **only** for `publicar.mjs` | `gh auth login` |
+
+> **The credential does NOT go in the environment.** OpenCode Zen's credential
+> lives where `opencode auth login` leaves it (`~/.local/share/opencode/auth.json`).
+
+> **The enclosure requires user namespaces without privileges.** Without them
+> `bwrap` does not start and **five `npm test` tests fail with messages that
+> look like verifier defects.** Inside a container:
 
 ```bash
 docker run --security-opt seccomp=unconfined \
@@ -126,112 +135,82 @@ docker run --security-opt seccomp=unconfined \
            --security-opt systempaths=unconfined ...
 ```
 
-Cada una falla distinto y por eso se pueden separar: sin `seccomp` no se crea el
-namespace; sin `apparmor` se crea y no se puede montar; sin `systempaths` falla al
-montar `/proc`.
+### The five steps
 
 ```bash
-# 1. instalar el sistema en el proyecto (crea su .opencode/)
-#    --alcance y --comandos NO son opcionales fuera de un proyecto Node con src/:
-#    donde vive el código y cómo se corren las pruebas son propiedades del
-#    PROYECTO, no del rol del agente. Sin ellos el gate niega toda escritura.
-node runtimes/opencode/sync.mjs --en /ruta/a/tu-proyecto \
+# 1. install the system in the project (creates its .opencode/)
+node runtimes/opencode/sync.mjs --en /path/to/your-project \
   --alcance "server/**" --comandos "venv/bin/python -m pytest server/ -q"
 
-# 2. RECON entiende y BUILD implementa — desde un issue, o desde una frase
-node core/flow/recon-build.mjs --target /ruta/a/tu-proyecto --issue 12
-node core/flow/recon-build.mjs --target /ruta/a/tu-proyecto \
-  --task "lo que hay que hacer, en una frase"
+# 2. RECON understands, BUILD implements — from an issue or a phrase
+node core/flow/recon-build.mjs --target /path/to/your-project --issue 12
+node core/flow/recon-build.mjs --target /path/to/your-project \
+  --task "what needs to be done, in one sentence"
 
-# 3. el verificador mide y REVIEW juzga
-node core/flow/review.mjs --run runs/<fecha>
+# 3. the verifier measures, REVIEW judges
+node core/flow/review.mjs --run runs/<date>
 
-# 4. si REVIEW rechaza, el trabajo vuelve a BUILD
-node core/flow/rework.mjs --run runs/<fecha>
-node core/flow/review.mjs --run runs/<fecha>/vuelta-2
+# 4. if REVIEW rejects, work goes back to BUILD
+node core/flow/rework.mjs --run runs/<date>
+node core/flow/review.mjs --run runs/<date>/vuelta-2
 
-# 5. si todo salió en verde, se publica. Sin --confirmar solo dice qué haría.
-node core/flow/publicar.mjs --run runs/<fecha>
-node core/flow/publicar.mjs --run runs/<fecha> --confirmar
+# 5. if everything is green, publish. Without --confirmar it only says what it would do.
+node core/flow/publicar.mjs --run runs/<date>
+node core/flow/publicar.mjs --run runs/<date> --confirmar
 ```
 
-El paso 5 se niega a publicar si no hay dictamen, si el dictamen quedó
-descartado, si el verificador midió RECHAZADO, o si **el árbol ya no es el que se
-verificó** — se sella el contenido de cada archivo tocado al medir y se vuelve a
-comprobar al publicar. Entre medir y publicar pasa tiempo, y un PR con el sello
-de una verificación hecha sobre otro contenido es peor que un PR sin sello.
+Step 5 refuses to publish if there is no dictamen, if the dictamen was
+discarded, if the verifier measured REJECTED, or if **the tree is no longer
+the one that was verified** — it seals the content of every touched file
+at measure-time and rechecks at publish-time.
 
-Cada corrida deja `runs/<fecha>/` con lo que RECON entendió, lo que BUILD dice
-que hizo, **lo que hizo de verdad** (`cambios.diff`), lo que la política le negó,
-lo que se midió y lo que REVIEW dictaminó. `runs/` no se versiona: ahí dentro hay
-transcripts completos.
-
-⚠️ El proyecto tiene que ser un repositorio git: el verificador compara contra
-`HEAD` para saber qué tocó el agente.
-
-⚠️ El plugin instalado apunta a la política de **este** repositorio por ruta
-absoluta. Si mueves el sistema de sitio, vuelve a correr el paso 1.
+Each run leaves `runs/<date>/` with what RECON understood, what BUILD says it
+did, **what it actually did** (`cambios.diff`), what the policy denied, what was
+measured, and what REVIEW ruled. `runs/` is not versioned.
 
 ---
 
-## Comprobar que las fronteras siguen siendo reales
+## `$ npm test` — verify the boundaries still hold
 
 ```bash
-npm test                  # 271 tests, ~1 s, CERO llamadas al proveedor
-npm run gate:contencion   # el recinto: 13 ataques deterministas, cuesta cero
-npm run relevo            # regenera runtimes/opencode/eleccion.json (gitignored)
-npm run sync               # materializa lab/.opencode/ (gitignored)
-npm run sync:check        # ¿lo instalado coincide con lo que sync acaba de escribir?
+npm test                  # 271 tests, ~1 s, ZERO provider calls
+npm run gate:contencion   # the enclosure: 13 deterministic attacks, costs zero
+npm run relevo            # regenerates runtimes/opencode/eleccion.json (gitignored)
+npm run sync              # materializes lab/.opencode/ (gitignored)
+npm run sync:check        # does installed match what sync just wrote?
 ```
 
-Estos cinco se pueden correr siempre. Los que llaman al modelo —
-`core/verification/wiring.mjs` y `core/verification/boundary.mjs` — cuestan
-corridas reales y por eso no son parte de `npm test`: una suite que gasta cuota
-del proveedor se deja de correr, y una suite que no se corre no protege nada.
-
-⚠️ `gate:contencion` mide la red. Correrlo dentro de un sandbox que bloquee la
-salida a internet convierte un ataque contenido en un "no discrimina" que no es
-verdad.
-
-⚠️ **`sync:check` en un árbol recién clonado sale "desincronizado" sin que nada
-esté roto**, por dos razones que son la misma: los `.opencode/` que compara son
-gitignored a propósito (`eleccion.json` caduca con la cuota del día;
-`plugins/policy-gate.ts` lleva una ruta absoluta que pertenece a la máquina
-donde se instaló, ver más abajo). Sin haber corrido `relevo` y `sync` primero
-no hay contra qué comparar. El orden que de verdad hace falta es
-`relevo` → `sync` → `sync:check`, y así lo corre `.github/workflows/ci.yml`.
-
-⚠️ **El recinto (`bwrap`) necesita el intérprete montado, y en máquinas con
-`node` fuera de `/usr`** (nvm, asdf, volta, los runners de GitHub Actions,
-que lo instalan en `/opt/hostedtoolcache/`) hay que tener bubblewrap instalado
-y, en Ubuntu 24.04+, permitir user namespaces sin privilegios:
-`sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0`. El propio
-`correrSuiteAislada` monta el intérprete de solo lectura desde donde de verdad
-esté (`process.execPath`), así que lo único que falta ponerlo es el sysctl.
+The five above can run anytime. The ones that call the model (`wiring.mjs`
+and `boundary.mjs`) cost real runs and are not part of `npm test`:
+a suite that spends provider quota stops getting run,
+and a suite that does not get run protects nothing.
 
 ---
 
-## Estado
+## `$ phases` — status
 
-| Fase | Qué prueba | Estado |
+| Phase | What it tests | Status |
 |---|---|---|
-| 0 · Fundación | saber qué hay | **cerrada** |
-| 1 · Un agente encerrado | que la frontera sea real | **cerrada** |
-| 2 · Frontera de escritura | que BUILD no se salga | **cerrada** |
-| 3 · Verificación | que el sistema no crea | **cerrada** |
-| 4 · Ciclo de tres | RECON → BUILD → REVIEW | **cerrada** |
-| 5 · Orquestación | que ATLAS decida, no que el modelo elija la ruta | **cerrada** |
-| 6 · Portabilidad | que sobreviva fuera de OpenCode | **cerrada** |
+| 0 · Foundation | know what's there | **closed** |
+| 1 · Enclosed agent | that the boundary is real | **closed** |
+| 2 · Write boundary | that BUILD stays in scope | **closed** |
+| 3 · Verification | that the system does not believe | **closed** |
+| 4 · Three-agent cycle | RECON -> BUILD -> REVIEW | **closed** |
+| 5 · Orchestration | that ATLAS decides, not the model choosing routes | **closed** |
+| 6 · Portability | that it survives outside OpenCode | **closed** |
 
-**Las siete fases del plan original están cerradas** (2026-08-26). El issue
-`Najo24-code/yunque#1` entró solo y salió como PR (`yunque#2`), con una vuelta
-de rechazo que pidió un defecto real, no una simulada. Lo que sigue no está
-escrito todavía: el propio `docs/ROADMAP.md` dice que la escala se mide en
-*cuántas tareas puede ejecutar a la vez sin que nadie las vigile*, y eso no es
-ninguna de las siete.
+**All seven phases of the original plan are closed** (2026-08-26).
+Issue `Najo24-code/yunque#1` entered alone and left as a PR (`yunque#2`),
+with a rejection round that required a real defect, not a simulated one.
 
-Detalle en [`docs/ROADMAP.md`](docs/ROADMAP.md); un informe por fase en
+Details in [`docs/ROADMAP.md`](docs/ROADMAP.md); one report per phase in
 [`docs/audits/`](docs/audits/).
 
-Una fase no se cierra sin su informe, y si el gate falla la fase sigue abierta:
-no se avanza "mientras tanto" a la siguiente.
+A phase does not close without its report. If the gate fails, the phase
+stays open. No skipping ahead "while we're at it."
+
+---
+
+## `$ license`
+
+[MIT](LICENSE)
